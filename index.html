@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>Global SM Plant Status (Full 123 Sites)</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        :root { --primary: #0A2647; --accent: #1597BB; --trouble: #1A1A1B; --bg: #F0F5F9; }
+        body, html { margin: 0; padding: 0; height: 100%; font-family: 'Pretendard', sans-serif; overflow: hidden; }
+        #layout { display: flex; height: 100vh; }
+        #sidebar { width: 450px; background: white; z-index: 2000; display: flex; flex-direction: column; box-shadow: 2px 0 10px rgba(0,0,0,0.1); }
+        #map { flex-grow: 1; z-index: 1; }
+        .header { background: var(--primary); color: white; padding: 20px; }
+        .global-cap { background: var(--accent); padding: 15px 20px; color: white; }
+        #list-container { flex-grow: 1; overflow-y: auto; background: var(--bg); }
+        /* 계층형 스타일 */
+        .region-item { border-bottom: 1px solid #ccc; }
+        .region-header { background: #cbdceb; padding: 12px; font-weight: bold; cursor: pointer; display: flex; justify-content: space-between; }
+        .country-list { display: none; }
+        .region-item.open .country-list { display: block; }
+        .country-header { padding: 10px 10px 10px 25px; background: #eef2f5; cursor: pointer; border-bottom: 1px solid #ddd; display: flex; justify-content: space-between; font-size: 0.9rem; }
+        .plant-list { display: none; }
+        .country-item.open .plant-list { display: block; }
+        .plant-card { padding: 8px 8px 8px 40px; border-bottom: 1px solid #eee; cursor: pointer; font-size: 0.8rem; background: white; }
+        .plant-card.issue { border-left: 4px solid var(--trouble); background: #fff4f4; }
+        .badge { font-size: 0.6rem; padding: 2px 4px; border-radius: 3px; color: white; background: var(--accent); float: right; }
+        .badge.black { background: var(--trouble); }
+    </style>
+</head>
+<body>
+    <div id="layout">
+        <div id="sidebar">
+            <div class="header"><h1>Global SM Status (123 Sites)</h1></div>
+            <div class="global-cap">Total Capa: <strong id="total-val">0</strong> K MT/Y</div>
+            <div id="list-container"></div>
+        </div>
+        <div id="map"></div>
+    </div>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        const map = L.map('map').setView([20, 40], 3);
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png').addTo(map);
+
+        fetch('data.json').then(r => r.json()).then(data => {
+            const plants = data.plants;
+            document.getElementById('total-val').innerText = plants.reduce((s, p) => s + p.capacity, 0).toLocaleString();
+            
+            const nested = {};
+            plants.forEach(p => {
+                if (!nested[p.region]) nested[p.region] = { capa: 0, countries: {} };
+                if (!nested[p.region].countries[p.country]) nested[p.region].countries[p.country] = { capa: 0, plants: [] };
+                nested[p.region].capa += p.capacity;
+                nested[p.region].countries[p.country].capa += p.capacity;
+                nested[p.region].countries[p.country].plants.push(p);
+
+                // 마커 생성
+                const color = p.status === 'Normal' ? '#1597BB' : '#1A1A1B';
+                const m = L.circleMarker([p.lat, p.lng], { radius: Math.sqrt(p.capacity)*1.2, fillColor: color, color: '#fff', fillOpacity: 0.7 }).addTo(map);
+                m.bindPopup(`<b>${p.company}</b><br>${p.capacity}K MT<br>Status: ${p.status}`);
+                p._m = m;
+            });
+
+            const container = document.getElementById('list-container');
+            Object.keys(nested).forEach(r => {
+                const rDiv = document.createElement('div');
+                rDiv.className = 'region-item';
+                rDiv.innerHTML = `<div class="region-header" onclick="this.parentElement.classList.toggle('open')"><span>${r}</span><span>${nested[r].capa.toLocaleString()}K</span></div>`;
+                const cList = document.createElement('div');
+                cList.className = 'country-list';
+                Object.keys(nested[r].countries).forEach(c => {
+                    const cDiv = document.createElement('div');
+                    cDiv.className = 'country-item';
+                    cDiv.innerHTML = `<div class="country-header" onclick="this.parentElement.classList.toggle('open')"><span>${c}</span><span>${nested[r].countries[c].capa.toLocaleString()}K</span></div>`;
+                    const pList = document.createElement('div');
+                    pList.className = 'plant-list';
+                    nested[r].countries[c].plants.forEach(p => {
+                        const card = document.createElement('div');
+                        card.className = `plant-card ${p.status!=='Normal'?'issue':''}`;
+                        card.innerHTML = `${p.company} <span class="badge ${p.status!=='Normal'?'black':''}">${p.status}</span><br><small>${p.capacity}K</small>`;
+                        card.onclick = () => { map.flyTo([p.lat, p.lng], 8); p._m.openPopup(); };
+                        pList.appendChild(card);
+                    });
+                    cDiv.appendChild(pList);
+                    cList.appendChild(cDiv);
+                });
+                rDiv.appendChild(cList);
+                container.appendChild(rDiv);
+            });
+        });
+    </script>
+</body>
+</html>
