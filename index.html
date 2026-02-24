@@ -1,330 +1,784 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-    <meta charset="UTF-8">
-    <title>Global SM Status | Verified 122 Sites Precision Dashboard</title>
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <style>
-        :root { --primary: #1F3044; --accent: #4FA0C1; --current: #1A1A1B; --future: #F39C12; --bg: #F8FAFC; }
-        body, html { margin: 0; padding: 0; height: 100%; font-family: 'Pretendard', sans-serif; overflow: hidden; }
-        #layout { display: flex; height: 100vh; width: 100vw; position: relative; }
-        #map { flex-grow: 1; height: 100%; background: #E2E8F0; z-index: 1; }
-        #sidebar { position: absolute; left: 0; top: 0; width: 320px; height: 100%; background: white; z-index: 2000; transition: transform 0.5s ease; box-shadow: 5px 0 15px rgba(0,0,0,0.05); display: flex; flex-direction: column; }
-        #sidebar.hidden { transform: translateX(-100%); }
-        #toggle-btn { position: absolute; right: -45px; top: 20px; width: 45px; height: 45px; background: var(--primary); color: white; border: none; cursor: pointer; border-radius: 0 8px 8px 0; font-size: 18px; z-index: 2001; }
-        .header { background: var(--primary); color: white; padding: 15px; cursor: pointer; }
-        .global-cap { background: var(--accent); padding: 12px 15px; color: white; border-bottom: 2px solid rgba(0,0,0,0.05); cursor: pointer; }
-        #list-container { flex-grow: 1; overflow-y: auto; background: var(--bg); }
-        .group-header { padding: 10px 12px; font-weight: bold; cursor: pointer; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(0,0,0,0.03); font-size: 0.78rem; }
-        .risk-header-current { background: var(--current); color: white; }
-        .risk-header-future { background: var(--future); color: white; }
-        .region-header { background: #CBD5E1; color: var(--primary); }
-        .country-header { background: #F1F5F9; color: #475569; padding-left: 20px; font-size: 0.75rem; }
-        .collapsible-content { display: none; }
-        .open > .collapsible-content { display: block; }
-        .plant-card { padding: 10px 12px 10px 30px; border-bottom: 1px solid #F1F5F9; cursor: pointer; font-size: 0.72rem; background: white; position: relative; }
-        .plant-card.current-risk { border-left: 6px solid var(--current); }
-        .plant-card.future-risk { border-left: 6px solid var(--future); }
-        .badge { font-size: 0.55rem; padding: 2px 4px; border-radius: 3px; color: white; background: var(--accent); float: right; margin-left: 5px; }
-        .badge.black { background: var(--current); }
-        .badge.orange { background: var(--future); }
-        .loss-badge { background: #EF4444; color: white; font-weight: bold; padding: 1px 5px; border-radius: 10px; font-size: 0.58rem; position: absolute; right: 10px; top: 8px; }
-        .capa-info { color: #64748B; font-size: 0.6rem; margin-top: 2px; }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NEA Shutdown Dashboard 2026</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<style>
+/* ════════════════════════════════════════
+   화면 UI (라이트 테마)
+════════════════════════════════════════ */
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: 'Arial', sans-serif;
+  background: #f0f2f5; color: #1a2a3a;
+  min-height: 100vh; padding: 10px; font-size: 12px;
+}
+
+/* 헤더 */
+.hdr {
+  display: flex; align-items: center; justify-content: space-between;
+  background: linear-gradient(135deg, #1A5276, #1F618D);
+  border: 1px solid #1A5276; border-radius: 9px;
+  padding: 10px 15px; margin-bottom: 9px; gap: 8px; flex-wrap: wrap;
+}
+.hdr-title { font-size: 15px; font-weight: 700; color: #fff; }
+.hdr-sub   { font-size: 10px; color: #AED6F1; margin-top: 2px; }
+.hdr-btns  { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+
+/* 버튼 */
+.btn {
+  padding: 6px 12px; border-radius: 5px; font-size: 11px;
+  font-weight: 700; cursor: pointer; border: none; white-space: nowrap;
+  transition: filter 0.15s;
+}
+.btn:hover    { filter: brightness(1.1); }
+.btn:disabled { opacity: 0.4; cursor: not-allowed; filter: none; }
+.btn-green { background: #1e8449; color: #fff; font-size: 12px; padding: 7px 15px; }
+.btn-red   { background: #c0392b; color: #fff; }
+.btn-grey  { background: #e8ecf0; color: #34495e; border: 1px solid #ccd0d5; }
+
+/* 컨트롤 바 */
+.ctrl-bar {
+  display: flex; align-items: center; gap: 10px;
+  background: #fff; border: 1px solid #d5dae0;
+  border-radius: 7px; padding: 7px 13px; margin-bottom: 8px; flex-wrap: wrap;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+}
+.ctrl-lbl { font-size: 10px; color: #7f8c8d; white-space: nowrap; font-weight: 600; }
+
+/* 월 버튼 */
+.m-btns { display: flex; gap: 3px; flex-wrap: wrap; align-items: center; }
+.m-btn {
+  padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: 600;
+  cursor: pointer; border: 1px solid #ccd0d5; background: #f8f9fa; color: #4a6078;
+  transition: all 0.12s; user-select: none;
+}
+.m-btn:hover { border-color: #2980b9; background: #eaf4fb; color: #1a5276; }
+.m-btn.on    { background: #2980b9; border-color: #1a6ea0; color: #fff; font-weight: 700; }
+.m-btn-all {
+  padding: 4px 9px; border-radius: 4px; font-size: 11px; font-weight: 700;
+  cursor: pointer; border: 1px solid #ccd0d5; background: #eaf4fb; color: #1a5276;
+}
+.m-btn-all:hover { background: #d4e9f7; }
+
+/* 표시 토글 */
+.vtgl {
+  padding: 4px 9px; border-radius: 4px; font-size: 11px; font-weight: 600;
+  cursor: pointer; border: 1px solid #ccd0d5; background: #f8f9fa; color: #4a6078;
+  transition: all 0.12s;
+}
+.vtgl.on { background: #2980b9; border-color: #1a6ea0; color: #fff; font-weight: 700; }
+
+/* 통계 */
+.stat-bar { display: flex; gap: 6px; margin-bottom: 7px; flex-wrap: wrap; }
+.sbadge {
+  background: #fff; border: 1px solid #d5dae0; border-radius: 5px;
+  padding: 4px 10px; font-size: 10px; color: #5a6a7a;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+}
+.sbadge b { color: #1A5276; }
+.sbadge span { font-weight: 700; color: #1A5276; font-size: 11px; }
+
+/* 품목 섹션 */
+.prod-sec {
+  margin-bottom: 6px; border: 1px solid #d5dae0;
+  border-radius: 7px; overflow: hidden;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.07);
+}
+.tbl-wrap { overflow: auto; max-height: 32vh; background: #fff; }
+
+/* 캘린더 테이블 (라이트) */
+.cal-tbl { border-collapse: collapse; font-size: 10px; width: 100%; table-layout: auto; }
+.th-info {
+  background: #1A5276; color: #fff; font-weight: 700; font-size: 10px;
+  text-align: center; padding: 4px 3px; border: 1px solid #1a4a6a;
+  position: sticky; top: 0; left: 0; z-index: 20; white-space: nowrap;
+}
+.th-mon {
+  font-weight: 700; font-size: 10px; text-align: center; padding: 5px 2px;
+  border: 1px solid #bfc9ca; position: sticky; top: 0; z-index: 10;
+  white-space: normal; line-height: 1.4; vertical-align: middle;
+}
+.th-wk {
+  font-weight: 600; font-size: 8px; text-align: center; padding: 2px 1px;
+  border: 1px solid #d5d8dc; min-width: 24px; max-width: 26px;
+  white-space: nowrap; line-height: 1.3; position: sticky; top: 40px; z-index: 10;
+  background: #f4f6f7; color: #555;
+}
+.th-loss {
+  font-weight: 700; font-size: 8px; text-align: center; padding: 2px 3px;
+  border: 1px solid #d5d8dc; min-width: 45px; white-space: nowrap;
+  position: sticky; top: 26px; z-index: 10; background: #fef9e7; color: #7d6608;
+}
+.cur-wk-th {
+  background: #fef3cd !important; color: #e67e22 !important;
+  border-left: 2px solid #e67e22 !important; border-right: 2px solid #e67e22 !important;
+}
+.cal-tbl td { border: 1px solid #e0e4e8; padding: 2px 3px; }
+.td-co {
+  position: sticky; left: 0; z-index: 5; background: #eaf2fb;
+  color: #1a2a3a; font-weight: 600;
+  width: 1%; white-space: nowrap; font-size: 8px;
+}
+.td-loc { color: #34495e; font-size: 8px; width: 1%; white-space: nowrap; font-weight: 500; }
+.td-cap { text-align: right; color: #1a7a5e; font-weight: 700; width: 1%; white-space: nowrap; font-size: 8px; }
+.td-wk  { min-width: 24px; max-width: 26px; text-align: center; padding: 1px; }
+.td-loss { text-align: right; font-size: 9px; padding: 2px 4px; min-width: 42px; white-space: nowrap; }
+.tr-grp td {
+  background: #2C3E50 !important; color: #fff; font-weight: 700; font-size: 9px;
+  padding: 3px 7px; border-top: 1px solid #566573; white-space: nowrap;
+}
+.tr-e .td-co { background: #eaf2fb; }
+.tr-e td:not(.td-co) { background: #f4f6f7; }
+.tr-o .td-co { background: #f8fbfd; }
+.tr-o td:not(.td-co) { background: #ffffff; }
+
+/* Loss 합계 행 */
+.tr-loss td {
+  background: #fdfefe !important; font-weight: 700; font-size: 9px;
+  padding: 3px 4px; border-top: 2px solid #d5d8dc;
+}
+
+/* 범례 */
+.legend {
+  display: flex; align-items: center; gap: 12px; padding: 6px 14px;
+  font-size: 9px; color: #5a6a7a; background: #fff;
+  border: 1px solid #d5dae0; flex-wrap: wrap; margin-top: 5px; border-radius: 6px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+}
+.leg-i { display: flex; align-items: center; gap: 3px; }
+.leg-d { width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0; }
+
+/* 로딩 / 토스트 */
+.loading {
+  display: flex; align-items: center; justify-content: center;
+  height: 70px; font-size: 12px; color: #2980b9;
+}
+.spinner {
+  width: 18px; height: 18px; border: 2px solid #d5dae0; border-top-color: #2980b9;
+  border-radius: 50%; animation: spin 0.8s linear infinite; margin-right: 8px;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+#toast {
+  position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%);
+  background: #1e8449; color: #fff; padding: 8px 18px; border-radius: 6px;
+  font-size: 12px; font-weight: 700; box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+  opacity: 0; transition: opacity 0.3s; z-index: 9999; pointer-events: none;
+}
+#toast.show { opacity: 1; }
+#toast.warn { background: #ca6f1e; }
+#toast.err  { background: #c0392b; }
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: #f0f2f5; }
+::-webkit-scrollbar-thumb { background: #bdc3c7; border-radius: 2px; }
+
+/* PNG 캡처 전용 숨김 */
+#xl-clone {
+  position: fixed; left: -99999px; top: 0;
+  background: #fff; display: inline-block; z-index: -1;
+}
+</style>
 </head>
 <body>
-<div id="layout">
-    <div id="sidebar">
-        <button id="toggle-btn" onclick="document.getElementById('sidebar').classList.toggle('hidden')">📊</button>
-        <div class="header" onclick="resetToGlobal()">
-            <h1 style="margin:0; font-size:0.95rem;">Global SM Dashboard</h1>
-            <p style="margin:2px 0 0 0; font-size:0.7rem; color: #94A3B8; font-weight:bold;">made by LAM</p>
-            <p style="margin:4px 0 0 0; font-size:0.55rem; opacity:0.6;">Verified 122 Sites | China: 21,628kt | Marker Fix</p>
-        </div>
-        <div class="global-cap" onclick="resetToGlobal()">
-            <span style="font-size:0.6rem;">Global Total Capacity Tracking (100%)</span><br>
-            <strong id="global-val" style="font-size:1rem;">0</strong> <small>K MT/Y</small>
-        </div>
-        <div id="list-container">
-            <div id="current-risk-group" class="open">
-                <div class="group-header risk-header-current" onclick="this.parentElement.classList.toggle('open')"><span>⚠️ CURRENT RISK</span><span id="current-total-header"></span></div>
-                <div class="collapsible-content" id="current-risk-list"></div>
-            </div>
-            <div id="future-risk-group" class="open">
-                <div class="group-header risk-header-future" onclick="this.parentElement.classList.toggle('open')"><span>📅 FUTURE MAINT</span><span id="future-total-header"></span></div>
-                <div class="collapsible-content" id="future-risk-list"></div>
-            </div>
-            <div style="background: var(--primary); color:white; padding:8px 12px; font-size:0.7rem; font-weight:bold;">🌐 GLOBAL STATUS BY REGION</div>
-            <div id="region-list"></div>
-        </div>
-    </div>
-    <div id="map"></div>
+
+<!-- 헤더 -->
+<div class="hdr">
+  <div>
+    <div class="hdr-title">🏭 NEA Plant Shutdown Calendar 2026</div>
+    <div class="hdr-sub">SM · AN · BD · BPA · MMA 정기보수 / 가동정지 현황 (NEA Region)</div>
+  </div>
+  <div class="hdr-btns">
+    <button class="btn btn-grey"  onclick="scrollCurWeek()">📍 현재주차</button>
+    <button class="btn btn-red"   onclick="loadData()">🔄 갱신</button>
+    <button class="btn btn-green" id="btn-png" onclick="downloadPNG()">📷 PNG 저장</button>
+  </div>
 </div>
 
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<!-- 컨트롤 -->
+<div class="ctrl-bar">
+  <span class="ctrl-lbl">📅 월</span>
+  <div class="m-btns" id="m-btns">
+    <button class="m-btn-all" onclick="toggleAllM()">전체</button>
+  </div>
+  <div style="width:1px;height:20px;background:#2a3d65;"></div>
+  <span class="ctrl-lbl">👁️</span>
+  <div style="display:flex;gap:3px;">
+    <div class="vtgl on" id="vt-s" onclick="setView('shutdown')">정지만</div>
+    <div class="vtgl"    id="vt-a" onclick="setView('all')">전체</div>
+  </div>
+</div>
+
+<!-- 통계 -->
+<div class="stat-bar" id="stat-bar"></div>
+
+<!-- SM / AN / BD 섹션 -->
+<div id="sections">
+  <div class="loading"><div class="spinner"></div>데이터 로딩 중...</div>
+</div>
+
+<!-- 범례 -->
+<div class="legend">
+  <div class="leg-i"><div class="leg-d" style="background:#F1C40F;"></div>정기보수</div>
+  <div class="leg-i"><div class="leg-d" style="background:#E74C3C;"></div>긴급/비계획 정지</div>
+  <div class="leg-i"><div class="leg-d" style="background:#3498DB;"></div>예정 보수</div>
+  <div class="leg-i" style="margin-left:8px;color:#f39c12;">│ 현재주차</div>
+</div>
+
+<div id="xl-clone"></div>
+<div id="toast"></div>
+
 <script>
-    /* [지침] 122개 전체 데이터 - Anhui부터 순차적 기입 및 좌표 정밀 보정 */
-    const plantData = [
-        /* --- NEA CHINA (69 lines, Sum 21,628kt) --- */
-        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "Anhui Haoyuan Chemical", "location": "Fuyang", "capacity": 260, "lat": 32.91, "lng": 115.86, "status": "Normal"},
-        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "Anhui Jiaxi New Material", "location": "Huainan", "capacity": 350, "lat": 32.78, "lng": 116.82, "status": "Normal"},
-        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "Bora LyondellBasell", "location": "Panjin", "capacity": 350, "lat": 40.71, "lng": 122.12, "status": "Normal"},
-        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "China Petroleum Eng", "location": "Karamay", "capacity": 40, "lat": 45.59, "lng": 84.87, "status": "Normal"},
-        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "CSPC Huizhou L1", "location": "Huizhou", "capacity": 637, "lat": 22.74, "lng": 114.64, "status": "Normal"},
-        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "CSPC Huizhou L2", "location": "Huizhou", "capacity": 650, "lat": 22.76, "lng": 114.66, "status": "Normal"},
-        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "CNOOC Dongfang", "location": "Dongfang", "capacity": 120, "lat": 19.1, "lng": 108.65, "status": "Normal"},
-        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "Cnooc Ningbo Daxie", "location": "Ningbo", "capacity": 280, "lat": 29.93, "lng": 121.95, "status": "Normal"},
-        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "CNPC/PDVSA Guangdong", "location": "Jieyang", "capacity": 800, "lat": 22.95, "lng": 116.15, "status": "Normal"},
-        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "Daqing Petrochem L1", "location": "Daqing", "capacity": 100, "lat": 46.55, "lng": 125.12, "status": "Normal"},
-        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "Daqing Petrochem L2", "location": "Daqing", "capacity": 125, "lat": 46.56, "lng": 125.13, "status": "Normal"},
-        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "Fujian Gulei Petrochem", "location": "Zhangzhou", "capacity": 600, "lat": 23.93, "lng": 117.61, "status": "Maintenance (Future)", "days": 61, "period": "Mar 1 ~ Apr 30"},
-        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "Fujian Haiquan Chemical", "location": "Zhangzhou", "capacity": 227, "lat": 23.94, "lng": 117.62, "status": "Normal"},
-        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "Guangdong Xinhuayue", "location": "Maoming", "capacity": 30, "lat": 21.66, "lng": 110.92, "status": "Normal"},
-        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "Guoen Chemical", "location": "Dongming", "capacity": 150, "lat": 35.29, "lng": 115.09, "status": "Normal"},
-        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "Hengli Petrochemical", "location": "Dalian", "capacity": 720, "lat": 39.05, "lng": 121.35, "status": "Normal"},
-        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "Hongrun Petrochemical", "location": "Weifang", "capacity": 120, "lat": 37.15, "lng": 119.15, "status": "Normal"},
-        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "Lanzhou Huifeng", "location": "Lanzhou", "capacity": 25, "lat": 36.06, "lng": 103.83, "status": "Normal"},
-        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "Lihuayi Lijin L1", "location": "Dongying", "capacity": 80, "lat": 37.742, "lng": 118.452, "status": "Normal"},
-        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "Lihuayi Lijin L2", "location": "Dongying", "capacity": 720, "lat": 37.748, "lng": 118.462, "status": "Normal"},
-        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "New Solar Tech L1", "location": "Changzhou", "capacity": 250, "lat": 31.95, "lng": 119.98, "status": "Normal"},
-        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "New Solar Tech L2", "location": "Changzhou", "capacity": 300, "lat": 31.96, "lng": 119.99, "status": "Normal"},
-        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "Ningbo Huatai Shengfu", "location": "Ningbo", "capacity": 400, "lat": 30.05, "lng": 121.65, "status": "Normal"},
-        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "Ningbo Keyuan Refining", "location": "Ningbo", "capacity": 80, "lat": 30.06, "lng": 121.66, "status": "Normal"},
-        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "Ningbo ZRCC Lyondell L1", "location": "Ningbo", "capacity": 620, "lat": 30.0, "lng": 121.74, "status": "Normal"},
-        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "Ningbo ZRCC Lyondell L2", "location": "Ningbo", "capacity": 600, "lat": 30.01, "lng": 121.75, "status": "Normal"},
-        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "Panjin Ethylene", "location": "Panjin", "capacity": 195, "lat": 41.15, "lng": 122.05, "status": "Normal"},
-        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "PetroChina Dushanzi", "location": "Karamay", "capacity": 360, "lat": 44.35, "lng": 84.85, "status": "Normal"},
-        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "PetroChina Fushun", "location": "Fushun", "capacity": 60, "lat": 41.88, "lng": 123.95, "status": "Normal"},
-        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "PetroChina Guangxi L1", "location": "Qinzhou", "capacity": 35, "lat": 21.95, "lng": 108.62, "status": "Normal"},
-        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "PetroChina Guangxi L2", "location": "Qinzhou", "capacity": 302, "lat": 21.96, "lng": 108.63, "status": "Normal"},
-        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "PetroChina Huabei", "location": "Renqiu", "capacity": 80, "lat": 38.7, "lng": 116.1, "status": "Normal"},
-        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "PetroChina Jilin L1", "location": "Jilin City", "capacity": 600, "lat": 43.85, "lng": 126.55, "status": "Normal"},
-        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "PetroChina Jilin L2", "location": "Jilin City", "capacity": 320, "lat": 43.86, "lng": 126.56, "status": "Normal"},
-        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "PetroChina Jinxi", "location": "Huludao", "capacity": 60, "lat": 40.71, "lng": 120.84, "status": "Normal"},
-        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "PetroChina Jinzhou", "location": "Jinzhou", "capacity": 80, "lat": 41.09, "lng": 121.12, "status": "Normal"},
-        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "PetroChina Lanzhou", "location": "Lanzhou", "capacity": 60, "lat": 36.07, "lng": 103.84, "status": "Normal"},
-        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "Qingdao Haiwan Chem", "location": "Qingdao", "capacity": 500, "lat": 35.75, "lng": 119.85, "status": "Normal"},
-        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "Satellite Chemical", "location": "Lianyungang", "capacity": 600, "lat": 34.55, "lng": 119.35, "status": "Normal"},
-        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "Shaanxi Yanchang Petroleum", "location": "Yan'an", "capacity": 120, "lat": 36.59, "lng": 109.49, "status": "Normal"},
-        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "Shandong Huaxing", "location": "Dongying", "capacity": 80, "lat": 37.45, "lng": 118.51, "status": "Normal"},
-        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "Shandong Yulong", "location": "Yantai", "capacity": 500, "lat": 37.65, "lng": 120.35, "status": "Normal"},
-        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "Shanghai SECCO", "location": "Jinshan", "capacity": 650, "lat": 30.74, "lng": 121.43, "status": "Normal"},
-        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "Shenghong Petrochem", "location": "Lianyungang", "capacity": 450, "lat": 34.54, "lng": 119.34, "status": "Normal"},
-        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "Shengteng Tech", "location": "Cangzhou", "capacity": 80, "lat": 38.3, "lng": 116.85, "status": "Normal"},
-        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "Sinochem Quanzhou", "location": "Quanzhou", "capacity": 450, "lat": 25.15, "lng": 118.95, "status": "Normal"},
-        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "Sinopec Anqing L1", "location": "Anqing", "capacity": 100, "lat": 30.55, "lng": 117.05, "status": "Normal"},
-        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "Sinopec Anqing L2", "location": "Anqing", "capacity": 400, "lat": 30.56, "lng": 117.06, "status": "Normal"},
-        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "Sinopec Baling Assets", "location": "Yueyang", "capacity": 120, "lat": 29.45, "lng": 113.15, "status": "Normal"},
-        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "Sinopec Guangzhou", "location": "Guangzhou", "capacity": 80, "lat": 23.13, "lng": 113.26, "status": "Normal"},
-        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "Sinopec Hainan L1", "location": "Yangpu", "capacity": 500, "lat": 19.74, "lng": 109.18, "status": "Normal"},
-        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "SINOPEC Hainan Shihua L2", "location": "Yangpu", "capacity": 80, "lat": 19.75, "lng": 109.19, "status": "Normal"},
-        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "Sinopec Jingmen", "location": "Jingmen", "capacity": 80, "lat": 31.03, "lng": 112.2, "status": "Normal"},
-        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "Sinopec Jinling", "location": "Nanjing", "capacity": 60, "lat": 32.15, "lng": 118.95, "status": "Normal"},
-        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "Sinopec Luoyang", "location": "Luoyang", "capacity": 120, "lat": 34.62, "lng": 112.45, "status": "Normal"},
-        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "Sinopec Qingdao Ref", "location": "Qingdao", "capacity": 80, "lat": 36.08, "lng": 120.39, "status": "Normal"},
-        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "Sinopec Sabic Tianjin", "location": "Tianjin", "capacity": 35, "lat": 38.75, "lng": 117.65, "status": "Normal"},
-        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "SP Chemicals", "location": "Taixing", "capacity": 320, "lat": 32.16, "lng": 119.95, "status": "Normal"},
-        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "Tangshan Risun Chem", "location": "Tangshan", "capacity": 300, "lat": 38.98, "lng": 118.45, "status": "Normal"},
-        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "Tianjin Bohua Chem", "location": "Binhai", "capacity": 450, "lat": 38.68, "lng": 117.65, "status": "Trouble (Current)", "days": 45, "period": "Dec 25 ~ Feb 10"},
-        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "Tianjin Dagu Chemical", "location": "Binhai", "capacity": 500, "lat": 38.95, "lng": 117.75, "status": "Normal"},
-        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "Various_China Facilities", "location": "Nanjing", "capacity": 120, "lat": 32.05, "lng": 118.80, "status": "Normal"},
-        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "Wanhua Chemical L1", "location": "Yantai", "capacity": 650, "lat": 37.55, "lng": 121.35, "status": "Normal"},
-        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "Wanhua Chemical L2", "location": "Yantai", "capacity": 13, "lat": 37.56, "lng": 121.36, "status": "Normal"},
-        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "ZPC L1", "location": "Zhoushan", "capacity": 1200, "lat": 30.345, "lng": 122.150, "status": "Normal"},
-        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "ZPC L2", "location": "Zhoushan", "capacity": 600, "lat": 30.347, "lng": 122.155, "status": "Normal"},
-        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "ZPC L3", "location": "Zhoushan", "capacity": 600, "lat": 30.349, "lng": 122.160, "status": "Normal"},
-        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "Zhenhua Petrochem", "location": "Dongying", "capacity": 504, "lat": 37.45, "lng": 118.55, "status": "Normal"},
-        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "Zibo Juncheng Chem", "location": "Zibo", "capacity": 500, "lat": 36.81, "lng": 118.06, "status": "Normal"},
+// ════════════════════════════════════════════
+// 상수
+// ════════════════════════════════════════════
+var YEAR = 2026;
+var MN   = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+var M_DK = {1:'#1a2d40',2:'#1c2d38',3:'#1a3028',4:'#2c2a10',5:'#281a30',6:'#1a2530',
+            7:'#1a2830',8:'#2c1a1a',9:'#1a2c20',10:'#292810',11:'#221828',12:'#1a2430'};
+var M_XL = {1:'#D6E4F0',2:'#FDEBD0',3:'#D5F5E3',4:'#FCF3CF',5:'#E8DAEF',6:'#D6EAF8',
+            7:'#EAF4FF',8:'#FDEDEC',9:'#E9F7EF',10:'#FEF9E7',11:'#F5EEF8',12:'#EBF5FB'};
+var PRODS = [
+  { key:'SM',  icon:'SM',  hdColor:'#1A5276', hdBg:'#154360', secColor:'#2e6bc4' },
+  { key:'AN',  icon:'AN',  hdColor:'#145A32', hdBg:'#0E4024', secColor:'#1e8449' },
+  { key:'BD',  icon:'BD',  hdColor:'#6E2F1A', hdBg:'#4A1F12', secColor:'#ca6f1e' },
+  { key:'BPA', icon:'BPA', hdColor:'#4A235A', hdBg:'#2E1339', secColor:'#8e44ad' },
+  { key:'MMA', icon:'MMA', hdColor:'#1A4F72', hdBg:'#0E2D40', secColor:'#1a7fa8' }
+];
 
-        /* --- NEA JAPAN (7 lines) --- */
-        {"region": "NEA", "country": "JAPAN", "company": "Asahi Kasei Corp", "location": "Mizushima", "capacity": 390, "lat": 34.48, "lng": 133.72, "status": "Normal"},
-        {"region": "NEA", "country": "JAPAN", "company": "Denka Co Ltd (Chiba SM)", "location": "Ichihara", "capacity": 270, "lat": 35.51, "lng": 140.08, "status": "Maintenance (Future)", "days": 92, "period": "Jun ~ Aug"},
-        {"region": "NEA", "country": "JAPAN", "company": "Idemitsu Tokuyama L1", "location": "Shunan", "capacity": 120, "lat": 34.045, "lng": 131.81, "status": "Maintenance (Future)", "days": 92, "period": "Aug ~ Oct"},
-        {"region": "NEA", "country": "JAPAN", "company": "Idemitsu Tokuyama L2", "location": "Shunan", "capacity": 220, "lat": 34.055, "lng": 131.82, "status": "Maintenance (Future)", "days": 92, "period": "Aug ~ Oct"},
-        {"region": "NEA", "country": "JAPAN", "company": "NS Oita L1", "location": "Oita", "capacity": 190, "lat": 33.242, "lng": 131.662, "status": "Maintenance (Future)", "days": 75, "period": "Feb 15 ~ Apr 30"},
-        {"region": "NEA", "country": "JAPAN", "company": "NS Oita L2", "location": "Oita", "capacity": 230, "lat": 33.248, "lng": 131.672, "status": "Maintenance (Future)", "days": 75, "period": "Feb 15 ~ Apr 30"},
-        {"region": "NEA", "country": "JAPAN", "company": "Idemitsu Ichihara", "location": "Ichihara", "capacity": 210, "lat": 35.5, "lng": 140.095, "status": "Normal"},
+var allData  = {};
+var viewMode = 'shutdown';
+var weekMeta = buildWeekMeta();
+var isIOS    = /iPad|iPhone|iPod/.test(navigator.userAgent);
 
-        /* --- NEA KOREA (5 lines) [cite: 125, 127] --- */
-        {"region": "NEA", "country": "KOREA, SOUTH", "company": "Hanwha Total L1", "location": "Daesan", "capacity": 650, "lat": 37.010, "lng": 126.415, "status": "Normal"},
-        {"region": "NEA", "country": "KOREA, SOUTH", "company": "Hanwha Total L2", "location": "Daesan", "capacity": 400, "lat": 37.012, "lng": 126.417, "status": "Shutdown (Current)", "days": 365, "period": "Since Oct 2025"},
-        {"region": "NEA", "country": "KOREA, SOUTH", "company": "Lotte Chemical (Merged)", "location": "Daesan", "capacity": 580, "lat": 37.008, "lng": 126.412, "status": "Normal"},
-        {"region": "NEA", "country": "KOREA, SOUTH", "company": "SK geo centric (Ulsan)", "location": "Ulsan", "capacity": 450, "lat": 35.508, "lng": 129.352, "status": "Normal"},
-        {"region": "NEA", "country": "KOREA, SOUTH", "company": "YEOCHUN NCC", "location": "Yeosu", "capacity": 365, "lat": 34.825, "lng": 127.705, "status": "Normal"},
+// ════════════════════════════════════════════
+// 초기화
+// ════════════════════════════════════════════
+window.onload = function() { buildMonthBtns(); loadData(); };
 
-        /* --- NEA TAIWAN (7 lines) --- */
-        {"region": "NEA", "country": "TAIWAN", "company": "FCFC Mailiao L1", "location": "Mailiao", "capacity": 250, "lat": 23.785, "lng": 120.182, "status": "Normal"},
-        {"region": "NEA", "country": "TAIWAN", "company": "FCFC Mailiao L2", "location": "Mailiao", "capacity": 350, "lat": 23.792, "lng": 120.192, "status": "Normal"},
-        {"region": "NEA", "country": "TAIWAN", "company": "FCFC Mailiao L3", "location": "Mailiao", "capacity": 720, "lat": 23.8, "lng": 120.2, "status": "Normal"},
-        {"region": "NEA", "country": "TAIWAN", "company": "GPPC Line 2", "location": "Kaohsiung", "capacity": 130, "lat": 22.62, "lng": 120.31, "status": "Normal"},
-        {"region": "NEA", "country": "TAIWAN", "company": "Taiwan SM L1", "location": "Lin Yuan", "capacity": 180, "lat": 22.48, "lng": 120.4, "status": "Normal"},
-        {"region": "NEA", "country": "TAIWAN", "company": "Grand Pacific Line 3", "location": "Ta-She", "capacity": 250, "lat": 22.73, "lng": 120.36, "status": "Normal"},
-        {"region": "NEA", "country": "TAIWAN", "company": "Taiwan SM L2", "location": "Lin Yuan", "capacity": 160, "lat": 22.49, "lng": 120.41, "status": "Normal"},
+function buildMonthBtns() {
+  var c = document.getElementById('m-btns');
+  var now = new Date().getMonth() + 1;
+  for (var m = 1; m <= 12; m++) {
+    var b = document.createElement('button');
+    b.className   = 'm-btn' + (m === now ? ' on' : '');
+    b.dataset.m   = m;
+    b.textContent = m + '월';
+    b.onclick = (function(btn){ return function(){ btn.classList.toggle('on'); renderAll(); }; })(b);
+    c.appendChild(b);
+  }
+}
 
-        /* --- SEA (7 lines) --- */
-        {"region": "SEA", "country": "INDONESIA", "company": "SMI L1", "location": "Serang", "capacity": 100, "lat": -6.11, "lng": 106.15, "status": "Normal"},
-        {"region": "SEA", "country": "MALAYSIA", "company": "Idemitsu SM", "location": "Pasir Gudang", "capacity": 240, "lat": 1.47, "lng": 103.89, "status": "Maintenance (Future)", "days": 45, "period": "May 1 ~ Jun 15"},
-        {"region": "SEA", "country": "SINGAPORE", "company": "Aster Chemicals", "location": "Jurong Island", "capacity": 550, "lat": 1.27, "lng": 103.72, "status": "Normal"},
-        {"region": "SEA", "country": "THAILAND", "company": "IRPC", "location": "Rayong", "capacity": 260, "lat": 12.68, "lng": 101.28, "status": "Normal"},
-        {"region": "SEA", "country": "THAILAND", "company": "Siam SM", "location": "Rayong", "capacity": 300, "lat": 12.69, "lng": 101.29, "status": "Normal"},
-        {"region": "SEA", "country": "INDONESIA", "company": "SMI L2", "location": "Serang", "capacity": 240, "lat": -6.12, "lng": 106.16, "status": "Normal"},
-        {"region": "SEA", "country": "SINGAPORE", "company": "Shell Seraya", "location": "Jurong Island", "capacity": 390, "lat": 1.28, "lng": 103.73, "status": "Normal"},
+function toggleAllM() {
+  var btns  = document.querySelectorAll('.m-btn');
+  var anyOn = Array.from(btns).some(function(b){ return b.classList.contains('on'); });
+  btns.forEach(function(b){ anyOn ? b.classList.remove('on') : b.classList.add('on'); });
+  renderAll();
+}
 
-        /* --- Western Europe (9 lines) --- */
-        {"region": "Western Europe", "country": "BELGIUM", "company": "INEOS Antwerp L1", "location": "Antwerp", "capacity": 310, "lat": 51.22, "lng": 4.4, "status": "Normal"},
-        {"region": "Western Europe", "country": "BELGIUM", "company": "INEOS Antwerp L2", "location": "Antwerp", "capacity": 250, "lat": 51.23, "lng": 4.41, "status": "Normal"},
-        {"region": "Western Europe", "country": "FRANCE", "company": "TotalEnergies", "location": "Gonfreville", "capacity": 630, "lat": 49.49, "lng": 0.23, "status": "Normal"},
-        {"region": "Western Europe", "country": "GERMANY", "company": "BASF SE", "location": "Ludwigshafen", "capacity": 550, "lat": 49.48, "lng": 8.46, "status": "Normal"},
-        {"region": "Western Europe", "country": "ITALY", "company": "Eni Rewind", "location": "Mantova", "capacity": 430, "lat": 45.16, "lng": 10.79, "status": "Normal"},
-        {"region": "Western Europe", "country": "NETHERLANDS", "company": "Shell Nederland", "location": "Moerdijk", "capacity": 450, "lat": 51.69, "lng": 4.64, "status": "Normal"},
-        {"region": "Western Europe", "country": "SPAIN", "company": "Repsol Quimica", "location": "Tarragona", "capacity": 490, "lat": 41.16, "lng": 1.22, "status": "Maintenance (Current)", "days": 52, "period": "Jan 15 ~ Mar 8"},
-        {"region": "Western Europe", "country": "ITALY", "company": "Versalis SpA", "location": "Mantova", "capacity": 190, "lat": 45.17, "lng": 10.80, "status": "Normal"},
-        {"region": "Western Europe", "country": "NETHERLANDS", "company": "Ellba C.V.", "location": "Moerdijk", "capacity": 550, "lat": 51.68, "lng": 4.63, "status": "Normal"},
+function getSelMonths() {
+  return Array.from(document.querySelectorAll('.m-btn.on'))
+    .map(function(b){ return parseInt(b.dataset.m); })
+    .sort(function(a,b){ return a-b; });
+}
 
-        /* --- Middle East (6 lines) [cite: 57, 233, 240, 301] --- */
-        {"region": "Middle East", "country": "IRAN", "company": "Pars Petrochem", "location": "Asaluyeh", "capacity": 630, "lat": 27.48, "lng": 52.61, "status": "Normal"},
-        {"region": "Middle East", "country": "IRAN", "company": "Tabriz Petrochem", "location": "Tabriz", "capacity": 95, "lat": 38.07, "lng": 46.29, "status": "Normal"},
-        {"region": "Middle East", "country": "KUWAIT", "company": "Kuwait Styrene", "location": "Shuaiba", "capacity": 525, "lat": 29.04, "lng": 48.16, "status": "Trouble (Current)", "days": 65, "period": "Jan ~ Mar", "reason": "FM Declared"},
-        {"region": "Middle East", "country": "SAUDI ARABIA", "company": "Petrokemya L1", "location": "Al Jubail", "capacity": 570, "lat": 27.010, "lng": 49.660, "status": "Trouble (Current)", "days": 60, "period": "Jan 15 ~ Mar 15"},
-        {"region": "Middle East", "country": "SAUDI ARABIA", "company": "Petrokemya L2", "location": "Al Jubail", "capacity": 550, "lat": 27.012, "lng": 49.665, "status": "Trouble (Current)", "days": 60, "period": "Jan 15 ~ Mar 15"},
-        {"region": "Middle East", "country": "SAUDI ARABIA", "company": "Jubail CP", "location": "Al Jubail", "capacity": 750, "lat": 27.015, "lng": 49.670, "status": "Normal"},
+function setView(v) {
+  viewMode = v;
+  document.getElementById('vt-s').classList.toggle('on', v === 'shutdown');
+  document.getElementById('vt-a').classList.toggle('on', v === 'all');
+  renderAll();
+}
 
-        /* --- North America (9 lines) --- */
-        {"region": "North America", "country": "CANADA", "company": "Shell Canada", "location": "Ft. Sask", "capacity": 450, "lat": 53.71, "lng": -113.21, "status": "Normal"},
-        {"region": "North America", "country": "UNITED STATES", "company": "AmSty L1", "location": "St. James", "capacity": 500, "lat": 30.01, "lng": -90.85, "status": "Normal"},
-        {"region": "North America", "country": "UNITED STATES", "company": "Cos-Mar L1", "location": "Carville", "capacity": 567, "lat": 30.22, "lng": -91.1, "status": "Trouble (Current)", "days": 90, "period": "Jan ~ Apr"},
-        {"region": "North America", "country": "UNITED STATES", "company": "Cos-Mar L2", "location": "Carville", "capacity": 567, "lat": 30.23, "lng": -91.11, "status": "Trouble (Current)", "days": 90, "period": "Jan ~ Apr"},
-        {"region": "North America", "country": "UNITED STATES", "company": "INEOS Pasadena", "location": "Pasadena", "capacity": 771, "lat": 29.7, "lng": -95.2, "status": "Normal"},
-        {"region": "North America", "country": "UNITED STATES", "company": "PO JV L1", "location": "Channelview", "capacity": 700, "lat": 29.81, "lng": -95.12, "status": "Normal"},
-        {"region": "North America", "country": "UNITED STATES", "company": "AmSty L2", "location": "St. James", "capacity": 453, "lat": 30.02, "lng": -90.86, "status": "Normal"},
-        {"region": "North America", "country": "UNITED STATES", "company": "INEOS Texas City", "location": "Texas City", "capacity": 454, "lat": 29.38, "lng": -94.9, "status": "Normal"},
-        {"region": "North America", "country": "UNITED STATES", "company": "PO JV L2", "location": "Channelview", "capacity": 700, "lat": 29.82, "lng": -95.13, "status": "Normal"},
+// ════════════════════════════════════════════
+// 데이터 로드 (GitHub 호스팅 → GAS fetch 방식)
+// ════════════════════════════════════════════
+var GAS_URL = 'https://script.google.com/macros/s/AKfycbz043Mr1OQxrGTbiSpj-UYpDWCVgoexwWGiA_dYVKjninoUM_O97W635sO_NbRwm_J-/exec';
 
-        /* --- South America (3 lines) --- */
-        {"region": "South America", "country": "ARGENTINA", "company": "Pampa Energia SA", "location": "San Martin", "capacity": 160, "lat": -32.72, "lng": -60.73, "status": "Normal"},
-        {"region": "South America", "country": "BRAZIL", "company": "CBE", "location": "Cubatao", "capacity": 120, "lat": -23.89, "lng": -46.42, "status": "Normal"},
-        {"region": "South America", "country": "BRAZIL", "company": "Videolar-Innova", "location": "Triunfo", "capacity": 420, "lat": -29.94, "lng": -51.35, "status": "Normal"}
-    ];
+function loadData() {
+  document.getElementById('sections').innerHTML =
+    '<div class="loading"><div class="spinner"></div>데이터 로딩 중...</div>';
 
-    const regionColors = { "NEA": "#A5C9CA", "SEA": "#C1D5A4", "Western Europe": "#D9CBFF", "Middle East": "#FFECC8", "North America": "#FFD1D1", "South America": "#E2E8F0" };
-    const regionFlyTo = { "NEA": { c: [32, 122], z: 4 }, "SEA": { c: [5, 110], z: 5 }, "Western Europe": { c: [50, 10], z: 5 }, "Middle East": { c: [28, 50], z: 5 }, "North America": { c: [38, -95], z: 4 }, "South America": { c: [-25, -60], z: 4 } };
+  fetch(GAS_URL + '?action=getDashboardData&t=' + new Date().getTime())
+    .then(function(res) {
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      return res.json();
+    })
+    .then(function(d) {
+      if (d.error) throw new Error(d.error);
+      allData = d;
+      renderAll();
+    })
+    .catch(function(e) {
+      document.getElementById('sections').innerHTML =
+        '<div class="loading" style="color:#e74c3c;">❌ 오류: ' + e.message + '</div>';
+    });
+}
 
-    const map = L.map('map', {zoomControl: false}).setView([20, 10], 2);
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png').addTo(map);
+function renderAll() { renderStats(); renderSections(); }
 
-    const globalTotalCapa = plantData.reduce((s, p) => s + p.capacity, 0);
-    document.getElementById('global-val').innerText = globalTotalCapa.toLocaleString();
+// ════════════════════════════════════════════
+// 통계 뱃지
+// ════════════════════════════════════════════
+function renderStats() {
+  var months = getSelMonths();
+  var html   = '';
+  PRODS.forEach(function(p) {
+    var rows  = filterRows(allData[p.key] || [], months);
+    var total = (allData[p.key] || []).length;
+    var shut  = rows.filter(function(r){ return r.weekColors && r.weekColors.some(Boolean); }).length;
+    var loss  = calcTotalLoss(rows, months);
+    var totCap = (allData[p.key] || []).reduce(function(s,r){ return s+(r.capacity||0); },0);
+    var lossRate = totCap > 0 ? (loss / totCap * 100).toFixed(1) : '0.0';
+    html += '<div class="sbadge"><b>' + p.key + '</b> '
+          + '정지:<span>' + shut + '</span>개 / NEA:<span>' + total + '</span>개'
+          + ' | Loss:<span>' + loss.toFixed(0) + '</span>kt'
+          + ' (<span>' + lossRate + '</span>%)</div>';
+  });
+  document.getElementById('stat-bar').innerHTML = html;
+}
 
-    function resetToGlobal() { map.flyTo([20, 10], 2, {duration: 2.0}); }
+// ════════════════════════════════════════════
+// 화면 섹션 렌더
+// ════════════════════════════════════════════
+function renderSections() {
+  var months    = getSelMonths();
+  var showWeeks = months.length > 0
+    ? weekMeta.filter(function(w){ return months.indexOf(w.month) !== -1; })
+    : weekMeta;
+  var curWeek   = getCurWeek();
+  var html      = '';
 
-    function flyWithOffset(latlng, zoom) {
-        const sidebar = document.getElementById('sidebar');
-        const offset = sidebar.classList.contains('hidden') ? 0 : 320;
-        const target = map.project(latlng, zoom).subtract([offset / 2, 0]);
-        map.flyTo(map.unproject(target, zoom), zoom, { duration: 2.0 });
-    }
+  PRODS.forEach(function(p) {
+    var rows     = filterRows(allData[p.key] || [], months);
+    var shutCnt  = rows.filter(function(r){ return r.weekColors&&r.weekColors.some(Boolean); }).length;
+    var totCap   = (allData[p.key]||[]).reduce(function(s,r){return s+(r.capacity||0);},0);
 
-    function calculateLoss(p) {
-        if (!p.days) return 0;
-        return ((p.capacity / 365) * p.days).toFixed(1);
-    }
+    html += '<div class="prod-sec" style="border-color:' + p.secColor + '88;">';
+    html += '<div class="tbl-wrap">'
+          + buildDarkTable(rows, showWeeks, curWeek, p.key, shutCnt, totCap, months)
+          + '</div></div>';
+  });
 
-    const currentRisks = plantData.filter(p => p.status.includes('Current'));
-    const futureRisks = plantData.filter(p => p.status.includes('Future'));
-    const curLossSum = currentRisks.reduce((s, p) => s + parseFloat(calculateLoss(p)), 0);
-    const futLossSum = futureRisks.reduce((s, p) => s + parseFloat(calculateLoss(p)), 0);
-    
-    document.getElementById('current-total-header').innerText = `${curLossSum.toLocaleString()}K MT Loss ▼`;
-    document.getElementById('future-total-header').innerText = `${futLossSum.toLocaleString()}K MT Loss ▼`;
+  document.getElementById('sections').innerHTML = html;
+}
 
-    const nested = {};
-    plantData.forEach(p => {
-        const isCurrent = p.status.includes('Current');
-        const isFuture = p.status.includes('Future');
-        let m;
+// ════════════════════════════════════════════
+// 다크 테이블 빌더
+// 컬럼: Company | Country | Cap | W1..Wn
+// ════════════════════════════════════════════
+function buildDarkTable(rows, showWeeks, curWeek, prodKey, shutCnt, totCap, months) {
+  var monthGroups = groupByMonth(showWeeks);
+  // 기본정보 컬럼: Company(고정) + Country + Cap = 3열
+  var nInfo = 3;
 
-        // [지침] 마커 크기 30% 확대 적용 (계수 상향)
-        if (isCurrent || isFuture) {
-            const riskCol = isCurrent ? '#1A1A1B' : '#F39C12';
-            m = L.circleMarker([p.lat, p.lng], { 
-                radius: Math.sqrt(p.capacity) * 0.59, 
-                fillColor: riskCol, color: 'transparent', weight: 0, fillOpacity: 0.95 
-            }).addTo(map);
+  var h = '<table class="cal-tbl"><thead>';
+
+  // ── 행1: 기본정보 헤더(rowspan=2) + 월 헤더 (Loss를 월 텍스트 안에 인라인 표시) ──
+  h += '<tr>';
+  // 기본정보 (rowspan=2)
+  h += '<th class="th-info" colspan="' + nInfo + '" rowspan="2" style="white-space:nowrap;font-size:10px;">'
+     + '<span style="color:#fff;font-weight:700;font-size:11px;">' + prodKey + '</span>'
+     + ' <span style="color:#AED6F1;font-weight:400;font-size:9px;">정지 ' + shutCnt + '개 설비</span></th>';
+
+  // 월 헤더: colspan = 주차수만, 텍스트에 Loss 인라인 포함
+  monthGroups.forEach(function(mg) {
+    var bg       = M_XL[mg.m] || '#f0f4f8';
+    var mLossKt  = rows.reduce(function(s,r){ return s + calcRowLoss(r, mg.m); }, 0);
+    var mLossRate= totCap > 0 ? (mLossKt / totCap * 100).toFixed(1) : '0.0';
+    var lossInfo = mLossKt > 0
+      ? '<br><span style="color:#1a252f;font-size:10px;font-weight:700;">' + mLossKt.toFixed(0) + 'kt / ' + mLossRate + '%</span>'
+      : '';
+    h += '<th class="th-mon" colspan="' + mg.wks.length + '" style="background:' + bg + ';color:#1a252f;padding:5px 2px;font-size:10px;">'
+       + MN[mg.m-1] + lossInfo + '</th>';
+  });
+  h += '</tr>';
+
+  // ── 행2: 주차 헤더만 (Loss 별도 열 없음) ──
+  h += '<tr>';
+  showWeeks.forEach(function(wk) {
+    var ic = wk.week === curWeek;
+    var bg = M_XL[wk.month] || '#f4f6f7';
+    h += '<th class="th-wk' + (ic?' cur-wk-th':'') + '" style="background:' + bg + ';color:#444;"'
+       + ' title="W' + wk.week + ': ' + wk.ms + '~' + wk.ss + '">'
+       + 'W' + wk.week + '<br><span style="font-size:7px;">' + wk.sd + '</span></th>';
+  });
+  h += '</tr></thead><tbody>';
+
+  if (!rows.length) {
+    var totalCols = nInfo + showWeeks.length;
+    h += '<tr><td colspan="' + totalCols + '" style="text-align:center;padding:14px;color:#4a6a88;font-size:10px;">데이터 없음</td></tr>';
+    h += '</tbody></table>';
+    return h;
+  }
+
+  // ── 데이터 행 (Country 그룹 헤더 제거, Country 컬럼 표시) ──
+  var ri_global = 0;
+  groupByCountry(rows).forEach(function(g) {
+    g.rows.forEach(function(r, ri) {
+      var tc = ri_global%2===0 ? 'tr-e' : 'tr-o';
+      ri_global++;
+      h += '<tr class="' + tc + '">';
+      h += '<td class="td-co" title="' + esc(r.company) + '">' + esc(r.company) + '</td>';
+      h += '<td class="td-loc">' + esc(g.country||'') + '</td>';
+      h += '<td class="td-cap">' + (r.capacity ? Math.round(r.capacity) : '—') + '</td>';
+
+      // 주차 셀만 (Loss는 월 헤더에 인라인 표시)
+      showWeeks.forEach(function(wk) {
+        var c  = r.weekColors ? r.weekColors[wk.idx] : null;
+        var ic = wk.week === curWeek;
+        h += '<td class="td-wk" style="'
+           + (c ? 'background:' + c + ';' : '')
+           + (ic ? 'border-left:2px solid #f39c12;border-right:2px solid #f39c12;' : '')
+           + '"></td>';
+      });
+      h += '</tr>';
+    });
+  });
+
+  // Loss 합계는 월 헤더에 인라인 표시
+
+  h += '</tbody></table>';
+  return h;
+}
+
+// ════════════════════════════════════════════
+// PNG 저장 - A4 가로 모드 (297×210mm = 3508×2480px @300dpi)
+// html2canvas scale=2 → 약 2480px 너비 목표
+// ════════════════════════════════════════════
+function downloadPNG() {
+  var months    = getSelMonths();
+  var showWeeks = months.length > 0
+    ? weekMeta.filter(function(w){ return months.indexOf(w.month) !== -1; })
+    : weekMeta;
+  var curWeek = getCurWeek();
+  var today   = new Date();
+  var ds      = today.getFullYear() + ('0'+(today.getMonth()+1)).slice(-2) + ('0'+today.getDate()).slice(-2);
+  var mLbl    = months.length === 0 ? 'ALL' : months.map(function(m){ return MN[m-1]; }).join('-');
+  var fname   = 'NEA_Shutdown_' + mLbl + '_' + ds + '.png';
+
+  var btn = document.getElementById('btn-png');
+  btn.disabled = true; btn.textContent = '⏳ 생성 중...';
+
+  var clone = document.getElementById('xl-clone');
+  clone.innerHTML = buildXLAll(showWeeks, curWeek, months, ds);
+
+  requestAnimationFrame(function(){
+    requestAnimationFrame(function(){
+      var target = document.getElementById('xl-wrap');
+
+      // A4 가로 비율을 맞추기 위해 스케일 계산
+      // A4 가로 = 297mm = 약 1240px @150dpi
+      // scale=2 → 캔버스는 target.scrollWidth*2 픽셀
+      html2canvas(target, {
+        backgroundColor: '#ffffff',
+        scale: 2,
+        useCORS: true,
+        logging: false,
+        scrollX: 0, scrollY: 0,
+        width:  target.scrollWidth,
+        height: target.scrollHeight
+      }).then(function(canvas) {
+        clone.innerHTML = '';
+        btn.disabled = false; btn.textContent = '📷 PNG 저장';
+
+        if (isIOS) {
+          var w = window.open('', '_blank');
+          if (w) {
+            w.document.write('<html><body style="margin:0;padding:8px;background:#eee;">'
+              + '<p style="font:11px Arial;color:#555;margin-bottom:5px;">📱 길게 눌러 저장 (' + fname + ')</p>'
+              + '<img src="' + canvas.toDataURL('image/png') + '" style="width:100%;border:1px solid #ccc;"></body></html>');
+            w.document.close();
+          }
+          showToast('📱 새 탭에서 이미지 길게 눌러 저장', 'warn', 4000);
         } else {
-            const iconSize = Math.sqrt(p.capacity) * 0.43 * 2.5; 
-            const regCol = regionColors[p.region];
-            const dropletIcon = L.divIcon({
-                className: 'custom-droplet',
-                html: `
-                <svg viewBox="0 0 24 24" width="${iconSize}" height="${iconSize}">
-                    <defs>
-                        <linearGradient id="g-${p.company.replace(/\W/g, '')}" x1="0%" y1="0%" x2="0%" y2="100%">
-                            <stop offset="0%" style="stop-color:white;stop-opacity:0.4" />
-                            <stop offset="100%" style="stop-color:black;stop-opacity:0.1" />
-                        </linearGradient>
-                    </defs>
-                    <path fill="${regCol}" d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/>
-                    <path fill="url(#g-${p.company.replace(/\W/g, '')})" d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/>
-                </svg>`,
-                iconSize: [iconSize, iconSize], iconAnchor: [iconSize/2, iconSize]
-            });
-            m = L.marker([p.lat, p.lng], { icon: dropletIcon }).addTo(map);
+          canvas.toBlob(function(blob){
+            var url = URL.createObjectURL(blob);
+            var a   = document.createElement('a');
+            a.href = url; a.download = fname;
+            document.body.appendChild(a); a.click(); document.body.removeChild(a);
+            setTimeout(function(){ URL.revokeObjectURL(url); }, 3000);
+            showToast('✅ 저장 완료: ' + fname, 'ok', 3000);
+          }, 'image/png');
         }
-        
-        // [지침] 지도 마커 직접 클릭 시 확대 기능
-        m.on('click', (e) => {
-            L.DomEvent.stopPropagation(e);
-            flyWithOffset([p.lat, p.lng], 9);
+      }).catch(function(e){
+        clone.innerHTML = '';
+        btn.disabled = false; btn.textContent = '📷 PNG 저장';
+        showToast('❌ 실패: ' + e.message, 'err', 4000);
+      });
+    });
+  });
+}
+
+// ════════════════════════════════════════════
+// 엑셀 스타일 전체 테이블 (PNG 캡처 전용)
+// A4 가로(297×210mm) 비율 최적화
+// ════════════════════════════════════════════
+function buildXLAll(showWeeks, curWeek, months, ds) {
+  var mLbl  = months.length === 0 ? 'All Months' : months.map(function(m){ return MN[m-1]; }).join(' · ');
+  var today = ds.slice(0,4) + '.' + ds.slice(4,6) + '.' + ds.slice(6);
+  var nI    = 3; // Company / Location / Cap
+  var bd    = 'border:1px solid #CCD1D1;';
+  var bd2   = 'border:1px solid #5D6D7E;';
+  var monthGroups = groupByMonth(showWeeks);
+  var totalCols   = nI + showWeeks.length;
+
+  // A4 가로 전체 너비 고정 (PPT/A4 최적)
+  // 기본정보 240px + 주차셀(22px*n) + Loss셀(40px*월*2)
+  var infoW  = 115;
+  var wkW    = 24;
+  var lossW  = 40;
+  var totalW = infoW + showWeeks.length * wkW;
+  // 최소 1100px (A4가로 비율 맞춤)
+  if (totalW < 1240) totalW = 1240;
+
+  var h = '<div id="xl-wrap" style="display:inline-block;background:#fff;'
+        + 'font-family:Arial,sans-serif;font-size:9px;width:' + totalW + 'px;">';
+
+  // ── 메인 타이틀 ──
+  h += '<table style="border-collapse:collapse;width:100%;">';
+  h += '<tr><td colspan="' + totalCols + '" style="background:#1B2631;color:#fff;'
+     + 'font-size:12px;font-weight:700;padding:7px 12px;' + bd2 + '">'
+     + '&nbsp;🏭&nbsp; NEA Plant Shutdown Calendar ' + YEAR
+     + '&nbsp;&nbsp;<span style="font-size:9px;color:#AEB6BF;font-weight:400;">'
+     + mLbl + '&nbsp;|&nbsp;' + today + ' 기준</span></td></tr>';
+  h += '</table>';
+
+  // ── SM / AN / BD 3섹션 ──
+  PRODS.forEach(function(prod, pi) {
+    var rows    = filterRows(allData[prod.key] || [], months);
+    var shutCnt = rows.filter(function(r){ return r.weekColors&&r.weekColors.some(Boolean); }).length;
+    var totCap  = (allData[prod.key]||[]).reduce(function(s,r){return s+(r.capacity||0);},0);
+
+    h += '<table style="border-collapse:collapse;width:100%;table-layout:auto;margin-top:' + (pi===0?'0':'4px') + ';">';
+
+    // 기본정보 헤더 (rowspan=2) + 월 헤더 (Loss 인라인)
+    h += '<tr>';
+    h += '<td colspan="' + nI + '" rowspan="2" style="background:' + prod.hdColor + ';color:#fff;'
+       + 'font-weight:700;font-size:10px;text-align:center;vertical-align:middle;'
+       + 'padding:4px 5px;' + bd + 'white-space:nowrap;">'
+       + prod.key
+       + '<br><span style="font-size:8px;font-weight:400;color:#AED6F1;">'
+       + '정지 ' + shutCnt + '개 설비 | NEA ' + (allData[prod.key]||[]).length + '개</span></td>';
+
+    // 월 헤더: colspan=주차수만, Loss를 월 텍스트 안에 인라인
+    monthGroups.forEach(function(mg) {
+      var bg       = M_XL[mg.m] || '#f0f4f8';
+      var mLossKt  = rows.reduce(function(s,r){ return s + calcRowLoss(r, mg.m); }, 0);
+      var mLossRate= totCap > 0 ? (mLossKt / totCap * 100).toFixed(1) : '0.0';
+      var lossInfo = mLossKt > 0
+        ? '<br><span style="color:#1a252f;font-size:10px;font-weight:700;">' + mLossKt.toFixed(0) + 'kt / ' + mLossRate + '%</span>'
+        : '';
+      h += '<td colspan="' + mg.wks.length + '" style="background:' + bg + ';color:#1a252f;'
+         + 'font-weight:700;font-size:10px;text-align:center;padding:5px 2px;line-height:1.4;' + bd + '">'
+         + MN[mg.m-1] + lossInfo
+         + '</td>';
+    });
+    h += '</tr>';
+
+    // 주차 헤더: 연속 루프 (Loss 별도 열 없음)
+    h += '<tr>';
+    showWeeks.forEach(function(wk) {
+      var bg  = M_XL[wk.month] || '#f0f4f8';
+      var ic  = wk.week === curWeek;
+      var cbg = ic ? '#FEF9E7' : bg;
+      var brd = ic ? 'border-left:2px solid #E67E22;border-right:2px solid #E67E22;' : bd;
+      h += '<td style="background:' + cbg + ';' + brd + 'font-weight:700;font-size:7px;'
+         + 'text-align:center;padding:2px 1px;width:' + wkW + 'px;white-space:nowrap;line-height:1.3;">'
+         + 'W' + wk.week + '<br><span style="font-size:6px;color:#7f8c8d;">' + wk.sd + '</span></td>';
+    });
+    h += '</tr>';
+
+    // 데이터 없음
+    if (!rows.length) {
+      h += '<tr><td colspan="' + totalCols + '" style="text-align:center;padding:10px;color:#888;font-size:9px;">데이터 없음</td></tr>';
+      h += '</table>';
+      return;
+    }
+
+    // 데이터 행 (Country 그룹 헤더 제거, Country 컬럼 표시)
+    var ri_g = 0;
+    groupByCountry(rows).forEach(function(g) {
+      g.rows.forEach(function(r, ri) {
+        var rb = ri_g%2===0 ? '#F2F3F4' : '#FFFFFF';
+        var co = ri_g%2===0 ? '#EBF5FB' : '#F8FAFB';
+        ri_g++;
+        h += '<tr>';
+         // Company
+         h += '<td style="background:' + co + ';color:#1a252f;font-weight:600;font-size:9px;'
+            + 'padding:2px 5px;' + bd + 'width:1%;white-space:nowrap;">'
+            + esc(r.company) + '</td>';
+         // Location
+         h += '<td style="background:' + rb + ';font-size:8px;color:#555;padding:2px 4px;' + bd + 'width:1%;white-space:nowrap;">'
+            + esc(g.country||'') + '</td>';
+         // Cap
+         h += '<td style="background:' + rb + ';text-align:right;font-weight:700;color:#117A65;font-size:9px;padding:2px 4px;' + bd + 'width:1%;white-space:nowrap;">'
+            + (r.capacity ? Math.round(r.capacity) : '') + '</td>';
+
+        // 주차 셀만 연속 (Loss는 월 헤더에 인라인)
+        showWeeks.forEach(function(wk) {
+          var c   = r.weekColors ? r.weekColors[wk.idx] : null;
+          var ic  = wk.week === curWeek;
+          var bg  = c ? c : rb;
+          var brd = ic ? 'border-left:2px solid #E67E22;border-right:2px solid #E67E22;' : bd;
+          h += '<td style="background:' + bg + ';' + brd + 'min-width:' + wkW + 'px;max-width:' + wkW + 'px;text-align:center;padding:1px;"></td>';
         });
-
-        const lossVal = calculateLoss(p);
-        const annualShare = ((p.capacity / globalTotalCapa) * 100).toFixed(2);
-        let pop = `<div style="padding:5px;"><strong>${p.company}</strong><br><small>${p.location}</small><hr style="border:0;border-top:1px solid #eee;">Capa: ${p.capacity.toLocaleString()}K MT (${annualShare}%)<br>Status: ${p.status}`;
-        if(p.days) pop += `<br><span style="color:#EF4444; font-weight:bold;">Loss: ${lossVal}K MT</span><br><small>Period: ${p.period}</small>`;
-        pop += `</div>`;
-        m.bindPopup(pop); p._m = m;
-
-        if (!nested[p.region]) nested[p.region] = { capa: 0, countries: {} };
-        if (!nested[p.region].countries[p.country]) nested[p.region].countries[p.country] = { capa: 0, plants: [] };
-        nested[p.region].capa += p.capacity;
-        nested[p.region].countries[p.country].capa += p.capacity;
-        nested[p.region].countries[p.country].plants.push(p);
+        h += '</tr>';
+      });
     });
 
-    const createCard = (p) => {
-        const loss = calculateLoss(p);
-        const share = ((p.capacity / globalTotalCapa) * 100).toFixed(2);
-        const card = document.createElement('div');
-        const isRisk = p.status.includes('Current') || p.status.includes('Future');
-        card.className = `plant-card ${p.status.includes('Current')?'current-risk':(p.status.includes('Future')?'future-risk':'')}`;
-        const bCol = p.status.includes('Current') ? 'black' : (p.status.includes('Future') ? 'orange' : '');
-        const lossBadge = isRisk ? `<span class="loss-badge">${loss}K</span>` : '';
-        card.innerHTML = `${lossBadge}<span class="badge ${bCol}">${p.status.split('(')[0]}</span><b>${p.company}</b><div class="capa-info">${p.capacity.toLocaleString()}K MT | ${share}% Global | ${p.days || 0} Days Stop</div>`;
-        card.onclick = (e) => { e.stopPropagation(); flyWithOffset([p.lat, p.lng], 9); setTimeout(() => p._m.openPopup(), 1800); };
-        return card;
-    };
+    // Loss 합계는 월 헤더에 인라인 표시되므로 별도 합계행 없음
 
-    currentRisks.sort((a,b)=>b.capacity-a.capacity).forEach(p=>document.getElementById('current-risk-list').appendChild(createCard(p)));
-    futureRisks.sort((a,b)=>b.capacity-a.capacity).forEach(p=>document.getElementById('future-risk-list').appendChild(createCard(p)));
+    h += '</table>';
+  });
 
-    Object.entries(nested).sort((a,b)=>b[1].capa - a[1].capa).forEach(([rName, rData]) => {
-        const rPct = ((rData.capa / globalTotalCapa) * 100).toFixed(1);
-        const rDiv = document.createElement('div');
-        rDiv.className = 'region-group';
-        rDiv.innerHTML = `<div class="group-header region-header" onclick="flyWithOffset(regionFlyTo['${rName}'].c, regionFlyTo['${rName}'].z); this.parentElement.classList.toggle('open')"><span>${rName} (${rData.capa.toLocaleString()}K | ${rPct}%)</span><span>▼</span></div><div class="collapsible-content"></div>`;
-        const countryList = rDiv.querySelector('.collapsible-content');
-        
-        Object.entries(rData.countries).sort((a,b)=>b[1].capa - a[1].capa).forEach(([cName, cData]) => {
-            const cPct = ((cData.capa / globalTotalCapa) * 100).toFixed(1);
-            const cDiv = document.createElement('div');
-            cDiv.className = 'country-item';
-            cDiv.innerHTML = `<div class="group-header country-header" onclick="this.parentElement.classList.toggle('open')"><span>${cName} (${cData.capa.toLocaleString()}K | ${cPct}%)</span><span>▼</span></div><div class="collapsible-content"></div>`;
-            const plantList = cDiv.querySelector('.collapsible-content');
-            cData.plants.forEach(p => plantList.appendChild(createCard(p)));
-            countryList.appendChild(cDiv);
-        });
-        document.getElementById('region-list').appendChild(rDiv);
+  // 범례
+  h += '<table style="border-collapse:collapse;width:100%;margin-top:3px;">';
+  h += '<tr><td style="background:#F8F9FA;border-top:2px solid #BDC3C7;padding:4px 12px;">'
+     + '<span style="font-size:8px;color:#555;margin-right:8px;">범례:</span>'
+     + dot('#F1C40F') + '<span style="font-size:8px;color:#555;margin-right:10px;">정기보수</span>'
+     + dot('#E74C3C') + '<span style="font-size:8px;color:#555;margin-right:10px;">긴급/비계획 정지</span>'
+     + dot('#3498DB') + '<span style="font-size:8px;color:#555;margin-right:14px;">예정 보수</span>'
+     + '<span style="font-size:8px;color:#7D6608;">Loss% = 해당 품목 NEA 전체 Capacity 대비 (Loss kt / NEA 전체 Capacity × 100)</span>'
+     + '</td></tr></table>';
+
+  h += '</div>';
+  return h;
+}
+
+function dot(c) {
+  return '<span style="display:inline-block;width:10px;height:10px;background:' + c
+       + ';border-radius:2px;vertical-align:middle;margin-right:3px;"></span>';
+}
+
+// ════════════════════════════════════════════
+// Loss 계산
+// Loss(kt) = Capacity(kt/y) × 해당월 정지일수 / 30 (월간 30일 기준)
+// ════════════════════════════════════════════
+function calcRowLoss(row, month) {
+  if (!row.weekColors || !row.capacity) return 0;
+  // 해당 월에 속하는 주차들
+  var mwks = weekMeta.filter(function(w){ return w.month === month; });
+  // 겹치는 주 수 카운트 (주당 7일 기준 → 실제 겹침일수는 단순히 정지 여부로만)
+  var shutDays = 0;
+  mwks.forEach(function(wk) {
+    if (row.weekColors[wk.idx]) {
+      // 해당 주의 월 내 일수 계산
+      var mon = wk.monday;
+      var sun = wk.sunday;
+      // 해당 월 범위
+      var mStart = new Date(YEAR, month-1, 1);
+      var mEnd   = new Date(YEAR, month, 0); // 월 말일
+      var os = mon > mStart ? mon : mStart;
+      var oe = sun < mEnd   ? sun : mEnd;
+      if (os <= oe) {
+        shutDays += (oe - os) / 86400000 + 1;
+      }
+    }
+  });
+  return row.capacity * shutDays / 30;
+}
+
+function calcTotalLoss(rows, months) {
+  var total = 0;
+  rows.forEach(function(r) {
+    months.forEach(function(m) { total += calcRowLoss(r, m); });
+  });
+  return total;
+}
+
+// ════════════════════════════════════════════
+// 유틸
+// ════════════════════════════════════════════
+function filterRows(rows, months) {
+  return rows.filter(function(r) {
+    if (viewMode === 'shutdown') {
+      if (!r.weekColors || !r.weekColors.some(Boolean)) return false;
+    }
+    if (months && months.length > 0) {
+      var mw  = weekMeta.filter(function(w){ return months.indexOf(w.month) !== -1; });
+      var hit = mw.some(function(w){ return r.weekColors && r.weekColors[w.idx]; });
+      if (!hit && viewMode === 'shutdown') return false;
+    }
+    return true;
+  });
+}
+
+function scrollCurWeek() {
+  var el = document.querySelector('.cur-wk-th');
+  if (el) el.scrollIntoView({ behavior:'smooth', block:'nearest', inline:'center' });
+}
+
+function showToast(msg, type, ms) {
+  var t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className   = 'show ' + (type==='ok'?'':type==='warn'?'warn':'err');
+  clearTimeout(t._t);
+  t._t = setTimeout(function(){ t.className=''; }, ms||3000);
+}
+
+function buildWeekMeta() {
+  var meta = [];
+  for (var w = 1; w <= 52; w++) {
+    var mon = isoMon(YEAR, w);
+    var sun = new Date(mon); sun.setDate(mon.getDate()+6);
+    var mid = new Date(mon); mid.setDate(mon.getDate()+3);
+    meta.push({
+      idx:w-1, week:w, month:mid.getMonth()+1,
+      monday:mon, sunday:sun,
+      ms:fd(mon), ss:fd(sun), sd:(mon.getMonth()+1)+'/'+mon.getDate()
     });
+  }
+  return meta;
+}
+
+function isoMon(yr, w) {
+  var j4=new Date(yr,0,4), d=j4.getDay()||7;
+  var w1=new Date(j4); w1.setDate(j4.getDate()-(d-1));
+  var m=new Date(w1); m.setDate(w1.getDate()+(w-1)*7);
+  return m;
+}
+
+function getCurWeek() {
+  var t = new Date();
+  for (var i=0;i<weekMeta.length;i++) {
+    if (t>=weekMeta[i].monday&&t<=weekMeta[i].sunday) return weekMeta[i].week;
+  }
+  return -1;
+}
+
+function fd(d) { return (d.getMonth()+1)+'/'+d.getDate(); }
+
+function groupByMonth(wks) {
+  var g=[], cur=null;
+  wks.forEach(function(w){
+    if (!cur||cur.m!==w.month){ cur={m:w.month,wks:[]}; g.push(cur); }
+    cur.wks.push(w);
+  });
+  return g;
+}
+
+function groupByCountry(rows) {
+  var idx={}, g=[];
+  rows.forEach(function(r){
+    var k=r.country||'Unknown';
+    if(idx[k]===undefined){idx[k]=g.length;g.push({country:k,rows:[]});}
+    g[idx[k]].rows.push(r);
+  });
+  return g;
+}
+
+function esc(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function stClrDk(s) {
+  if (!s) return '#607a90'; s=s.toLowerCase();
+  if (s.indexOf('future')!=-1)      return '#2980B9';
+  if (s.indexOf('maintenance')!=-1) return '#c8a000';
+  if (s.indexOf('shutdown')!=-1)    return '#c0392b';
+  return '#607a90';
+}
 </script>
 </body>
 </html>
