@@ -87,7 +87,8 @@ body {
   border-radius: 7px; overflow: hidden;
   box-shadow: 0 1px 4px rgba(0,0,0,0.07);
 }
-.tbl-wrap { overflow: auto; max-height: 32vh; background: #fff; }
+/* 품목 섹션 내부 스크롤 제거 - 모든 행 표시 */
+.tbl-wrap { overflow-x: auto; background: #fff; }
 
 /* 캘린더 테이블 (라이트) */
 .cal-tbl { border-collapse: collapse; font-size: 10px; width: 100%; table-layout: auto; }
@@ -293,7 +294,7 @@ function setView(v) {
 // ════════════════════════════════════════════
 // 데이터 로드 (GitHub 호스팅 → GAS fetch 방식)
 // ════════════════════════════════════════════
-var GAS_URL = 'https://script.google.com/macros/s/AKfycbyfX0RH9algMqjCpfdTGK38Z6uk4zSTGqRrpTP1i5Iap1gWDlxt-cTviEXIAmBdAmjQ/exec';
+var GAS_URL = 'https://script.google.com/macros/s/AKfycbx0XjMWwuPNBzLw8DXkusr1lo34cbzYZyKBcmdYffatqXEM3e0P2dv15G0edCdopfOm/exec';
 
 function loadData() {
   document.getElementById('sections').innerHTML =
@@ -467,16 +468,15 @@ function downloadPNG() {
     requestAnimationFrame(function(){
       var target = document.getElementById('xl-wrap');
 
-      // A4 가로 비율을 맞추기 위해 스케일 계산
-      // A4 가로 = 297mm = 약 1240px @150dpi
-      // scale=2 → 캔버스는 target.scrollWidth*2 픽셀
+      // A4 가로 고정 캡처 (PPT 삽입 최적화)
+      // scale=2 → 1754*2 = 3508px (A4 300dpi 수준)
       html2canvas(target, {
         backgroundColor: '#ffffff',
         scale: 2,
         useCORS: true,
         logging: false,
         scrollX: 0, scrollY: 0,
-        width:  target.scrollWidth,
+        width:  1754,
         height: target.scrollHeight
       }).then(function(canvas) {
         clone.innerHTML = '';
@@ -523,17 +523,19 @@ function buildXLAll(showWeeks, curWeek, months, ds) {
   var monthGroups = groupByMonth(showWeeks);
   var totalCols   = nI + showWeeks.length;
 
-  // A4 가로 전체 너비 고정 (PPT/A4 최적)
-  // 기본정보 240px + 주차셀(22px*n) + Loss셀(40px*월*2)
-  var infoW  = 115;
-  var wkW    = 24;
-  var lossW  = 40;
-  var totalW = infoW + showWeeks.length * wkW;
-  // 최소 1100px (A4가로 비율 맞춤)
-  if (totalW < 1240) totalW = 1240;
+  // A4 가로 고정 너비 (PowerPoint 삽입 최적화)
+  // A4 가로 = 297mm = 1754px @150dpi (PPT 삽입 기준)
+  var A4_W   = 1754;  // A4 가로 고정 px (150dpi 기준)
+  var infoW  = 115;   // Company + Country + Cap 열 고정 너비
+  var totalW = A4_W;  // 항상 A4 가로 고정
+  // 주차셀 너비 = 남은 공간 / 주차 수 (최소 14px, 최대 28px)
+  var wkW = showWeeks.length > 0
+    ? Math.min(28, Math.max(14, Math.floor((A4_W - infoW) / showWeeks.length)))
+    : 24;
 
-  var h = '<div id="xl-wrap" style="display:inline-block;background:#fff;'
-        + 'font-family:Arial,sans-serif;font-size:9px;width:' + totalW + 'px;">';
+  var h = '<div id="xl-wrap" style="display:block;background:#fff;'
+        + 'font-family:Arial,sans-serif;font-size:9px;width:' + totalW + 'px;'
+        + 'box-sizing:border-box;">';
 
   // ── 메인 타이틀 ──
   h += '<table style="border-collapse:collapse;width:100%;">';
