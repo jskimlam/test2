@@ -91,7 +91,11 @@ body {
 .tbl-wrap { overflow-x: auto; background: #fff; }
 
 /* 캘린더 테이블 (라이트) */
-.cal-tbl { border-collapse: collapse; font-size: 10px; width: 100%; table-layout: auto; }
+/* table-layout:fixed → 모든 품목 Company/Country/Cap 열 너비 동일 고정 */
+.cal-tbl { border-collapse: collapse; font-size: 10px; width: 100%; table-layout: fixed; }
+.col-co  { width: 140px; } /* Company 열 고정 너비 */
+.col-loc { width: 60px;  } /* Country 열 고정 너비 */
+.col-cap { width: 36px;  } /* Capacity 열 고정 너비 */
 .th-info {
   background: #1A5276; color: #fff; font-weight: 700; font-size: 10px;
   text-align: center; padding: 4px 3px; border: 1px solid #1a4a6a;
@@ -121,10 +125,11 @@ body {
 .td-co {
   position: sticky; left: 0; z-index: 5; background: #eaf2fb;
   color: #1a2a3a; font-weight: 600;
-  width: 1%; white-space: nowrap; font-size: 8px;
+  width: 140px; white-space: nowrap; font-size: 8px;
+  overflow: hidden; text-overflow: ellipsis; max-width: 140px;
 }
-.td-loc { color: #34495e; font-size: 8px; width: 1%; white-space: nowrap; font-weight: 500; }
-.td-cap { text-align: right; color: #1a7a5e; font-weight: 700; width: 1%; white-space: nowrap; font-size: 8px; }
+.td-loc { color: #34495e; font-size: 8px; width: 60px; white-space: nowrap; font-weight: 500; overflow: hidden; text-overflow: ellipsis; }
+.td-cap { text-align: right; color: #1a7a5e; font-weight: 700; width: 36px; white-space: nowrap; font-size: 8px; }
 .td-wk  { min-width: 24px; max-width: 26px; text-align: center; padding: 1px; }
 .td-loss { text-align: right; font-size: 9px; padding: 2px 4px; min-width: 42px; white-space: nowrap; }
 .tr-grp td {
@@ -373,7 +378,13 @@ function buildDarkTable(rows, showWeeks, curWeek, prodKey, shutCnt, totCap, mont
   // 기본정보 컬럼: Company(고정) + Country + Cap = 3열
   var nInfo = 3;
 
-  var h = '<table class="cal-tbl"><thead>';
+  var h = '<table class="cal-tbl">'
+        + '<colgroup>'
+        + '<col class="col-co">'   // Company 열 140px 고정
+        + '<col class="col-loc">'  // Country 열 60px 고정
+        + '<col class="col-cap">'  // Cap 열 36px 고정
+        + '</colgroup>'
+        + '<thead>';
 
   // ── 행1: 기본정보 헤더(rowspan=2) + 월 헤더 (Loss를 월 텍스트 안에 인라인 표시) ──
   h += '<tr>';
