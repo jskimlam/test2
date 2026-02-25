@@ -219,7 +219,7 @@ body {
 <!-- 통계 -->
 <div class="stat-bar" id="stat-bar"></div>
 
-<!-- SM / AN / BD 섹션 -->
+<!-- SM / AN / BD / BPA / MMA 섹션 -->
 <div id="sections">
   <div class="loading"><div class="spinner"></div>데이터 로딩 중...</div>
 </div>
@@ -297,9 +297,9 @@ function setView(v) {
 }
 
 // ════════════════════════════════════════════
-// 데이터 로드 (GitHub 호스팅 → GAS fetch 방식)
+// 데이터 로드 (GAS fetch 방식)
 // ════════════════════════════════════════════
-var GAS_URL = 'https://script.google.com/macros/s/AKfycbwDwa45M4NLr1Gya3rKHj7RnJW60vw85t9AOQbGZDUIuIZDTe9KdZPol2GAP2aoieyS/exec';
+var GAS_URL = 'https://script.google.com/macros/s/AKfycbx0XjMWwuPNBzLw8DXkusr1lo34cbzYZyKBcmdYffatqXEM3e0P2dv15G0edCdopfOm/exec';
 
 function loadData() {
   document.getElementById('sections').innerHTML =
@@ -370,8 +370,9 @@ function renderSections() {
 }
 
 // ════════════════════════════════════════════
-// 다크 테이블 빌더
+// 다크 테이블 빌더 (화면 UI용)
 // 컬럼: Company | Country | Cap | W1..Wn
+// table-layout:fixed + colgroup으로 열 너비 균일 고정
 // ════════════════════════════════════════════
 function buildDarkTable(rows, showWeeks, curWeek, prodKey, shutCnt, totCap, months) {
   var monthGroups = groupByMonth(showWeeks);
@@ -448,15 +449,19 @@ function buildDarkTable(rows, showWeeks, curWeek, prodKey, shutCnt, totCap, mont
     });
   });
 
-  // Loss 합계는 월 헤더에 인라인 표시
-
   h += '</tbody></table>';
   return h;
 }
 
 // ════════════════════════════════════════════
-// PNG 저장 - A4 가로 모드 (297×210mm = 3508×2480px @300dpi)
-// html2canvas scale=2 → 약 2480px 너비 목표
+// [수정1] PNG 저장 - A4 가로 고정 (297×210mm)
+// --------------------------------------------------
+// A4 가로 @150dpi = 1754 × 1240 px
+// html2canvas scale=2 → 최종 PNG = 3508 × 2480 px (300dpi 품질)
+//
+// 핵심 변경:
+//   - height를 scrollHeight 대신 A4_H(1240px) 고정으로 변경
+//   - buildXLAll() 호출 시 A4_H 전달 → 내부에서 행 높이 자동 압축
 // ════════════════════════════════════════════
 function downloadPNG() {
   var months    = getSelMonths();
@@ -472,23 +477,26 @@ function downloadPNG() {
   var btn = document.getElementById('btn-png');
   btn.disabled = true; btn.textContent = '⏳ 생성 중...';
 
+  // A4 가로 고정 치수 (150dpi 기준, scale=2 적용 시 300dpi 품질)
+  var A4_W = 1754; // A4 가로 px (150dpi)
+  var A4_H = 1240; // A4 세로 px (150dpi) ← 고정값
+
   var clone = document.getElementById('xl-clone');
-  clone.innerHTML = buildXLAll(showWeeks, curWeek, months, ds);
+  // A4_H를 buildXLAll에 전달 → 테이블 행 높이 압축 계산에 활용
+  clone.innerHTML = buildXLAll(showWeeks, curWeek, months, ds, A4_W, A4_H);
 
   requestAnimationFrame(function(){
     requestAnimationFrame(function(){
       var target = document.getElementById('xl-wrap');
 
-      // A4 가로 고정 캡처 (PPT 삽입 최적화)
-      // scale=2 → 1754*2 = 3508px (A4 300dpi 수준)
       html2canvas(target, {
         backgroundColor: '#ffffff',
-        scale: 2,
+        scale: 2,           // 150dpi → 300dpi 업스케일 (PPT 고화질)
         useCORS: true,
         logging: false,
         scrollX: 0, scrollY: 0,
-        width:  1754,
-        height: target.scrollHeight
+        width:  A4_W,       // A4 가로 고정
+        height: A4_H        // [수정] A4 세로 고정 (scrollHeight → 고정값)
       }).then(function(canvas) {
         clone.innerHTML = '';
         btn.disabled = false; btn.textContent = '📷 PNG 저장';
@@ -522,145 +530,210 @@ function downloadPNG() {
 }
 
 // ════════════════════════════════════════════
-// 엑셀 스타일 전체 테이블 (PNG 캡처 전용)
-// A4 가로(297×210mm) 비율 최적화
+// [수정1 + 수정2] PNG 캡처 전용 테이블 빌더
+// --------------------------------------------------
+// [수정1] A4 고정 높이에 맞춰 행 높이 자동 압축
+//   - 타이틀 행(20px) + 범례 행(20px) + 품목별 헤더 2행 제외
+//   - 남은 높이 / 전체 데이터 행 수 → 행 높이 역산 (최소 12px)
+//
+// [수정2] table-layout:fixed + colgroup으로 열 너비 균일 고정
+//   - 기존 table-layout:auto → fixed 변경
+//   - Company(coW) / Country(locW) / Cap(capW) 열 너비 명시적 고정
+//   - 모든 품목 테이블이 동일한 열 구조를 가짐
 // ════════════════════════════════════════════
-function buildXLAll(showWeeks, curWeek, months, ds) {
+function buildXLAll(showWeeks, curWeek, months, ds, A4_W, A4_H) {
   var mLbl  = months.length === 0 ? 'All Months' : months.map(function(m){ return MN[m-1]; }).join(' · ');
   var today = ds.slice(0,4) + '.' + ds.slice(4,6) + '.' + ds.slice(6);
-  var nI    = 3; // Company / Location / Cap
-  var bd    = 'border:1px solid #CCD1D1;';
-  var bd2   = 'border:1px solid #5D6D7E;';
+  var nI    = 3; // Company / Location / Cap 열 수
+  var bd    = 'border:1px solid #CCD1D1;';  // 일반 셀 테두리
+  var bd2   = 'border:1px solid #5D6D7E;';  // 헤더 테두리
   var monthGroups = groupByMonth(showWeeks);
   var totalCols   = nI + showWeeks.length;
 
-  // A4 가로 고정 너비 (PowerPoint 삽입 최적화)
-  // A4 가로 = 297mm = 1754px @150dpi (PPT 삽입 기준)
-  var A4_W   = 1754;  // A4 가로 고정 px (150dpi 기준)
-  var infoW  = 115;   // Company + Country + Cap 열 고정 너비
-  var totalW = A4_W;  // 항상 A4 가로 고정
-  // 주차셀 너비 = 남은 공간 / 주차 수 (최소 14px, 최대 28px)
+  // ── [수정2] 고정 열 너비 정의 ──
+  // 모든 품목 테이블에 동일하게 적용 → 열 정렬 균일 보장
+  var coW  = 110; // Company 열 고정 너비(px)
+  var locW = 55;  // Country 열 고정 너비(px)
+  var capW = 32;  // Cap 열 고정 너비(px)
+  var infoW = coW + locW + capW; // 기본정보 열 총 너비 = 197px
+
+  // ── [수정1] 주차 셀 너비 역산 ──
+  // 남은 가로 공간을 주차 수로 균등 분할 (최소 12px, 최대 30px)
   var wkW = showWeeks.length > 0
-    ? Math.min(28, Math.max(14, Math.floor((A4_W - infoW) / showWeeks.length)))
+    ? Math.min(30, Math.max(12, Math.floor((A4_W - infoW) / showWeeks.length)))
     : 24;
 
+  // ── [수정1] 행 높이 역산 ──
+  // A4 전체 높이에서 고정 영역(타이틀+범례+헤더) 제외 후 데이터 행 수로 나눔
+  var TITLE_H  = 22; // 메인 타이틀 행 높이(px)
+  var LEGEND_H = 22; // 범례 행 높이(px)
+  var HDR1_H   = 26; // 품목별 월 헤더 행 높이(px)
+  var HDR2_H   = 18; // 품목별 주차 헤더 행 높이(px)
+  var PROD_GAP = 4;  // 품목 간격(px)
+
+  // 전체 데이터 행 수 계산 (모든 품목 합산)
+  var totalDataRows = PRODS.reduce(function(sum, p) {
+    return sum + filterRows(allData[p.key] || [], months).length;
+  }, 0);
+  if (totalDataRows === 0) totalDataRows = 1; // 0나눔 방지
+
+  // 고정 영역 총 높이 = 타이틀 + 범례 + (헤더2행 × 품목수) + (품목간격 × 품목수)
+  var fixedH = TITLE_H + LEGEND_H
+             + (HDR1_H + HDR2_H + PROD_GAP) * PRODS.length;
+
+  // 데이터 행 1개당 높이 역산 (최소 12px 보장)
+  var rowH = Math.max(12, Math.floor((A4_H - fixedH) / totalDataRows));
+
+  // 폰트 크기도 행 높이에 비례 조정 (최소 7px, 최대 10px)
+  var fSize = Math.min(10, Math.max(7, rowH - 4));
+
+  // ── 전체 래퍼 div ──
   var h = '<div id="xl-wrap" style="display:block;background:#fff;'
-        + 'font-family:Arial,sans-serif;font-size:9px;width:' + totalW + 'px;'
-        + 'box-sizing:border-box;">';
+        + 'font-family:Arial,sans-serif;font-size:' + fSize + 'px;'
+        + 'width:' + A4_W + 'px;height:' + A4_H + 'px;'  // A4 고정 크기 명시
+        + 'box-sizing:border-box;overflow:hidden;">';       // 넘침 숨김 처리
 
   // ── 메인 타이틀 ──
   h += '<table style="border-collapse:collapse;width:100%;">';
   h += '<tr><td colspan="' + totalCols + '" style="background:#1B2631;color:#fff;'
-     + 'font-size:12px;font-weight:700;padding:7px 12px;' + bd2 + '">'
+     + 'font-size:12px;font-weight:700;padding:4px 12px;height:' + TITLE_H + 'px;' + bd2 + '">'
      + '&nbsp;🏭&nbsp; NEA Plant Shutdown Calendar ' + YEAR
      + '&nbsp;&nbsp;<span style="font-size:9px;color:#AEB6BF;font-weight:400;">'
      + mLbl + '&nbsp;|&nbsp;' + today + ' 기준</span></td></tr>';
   h += '</table>';
 
-  // ── SM / AN / BD 3섹션 ──
+  // ── 품목별 테이블 (SM / AN / BD / BPA / MMA) ──
   PRODS.forEach(function(prod, pi) {
     var rows    = filterRows(allData[prod.key] || [], months);
     var shutCnt = rows.filter(function(r){ return r.weekColors&&r.weekColors.some(Boolean); }).length;
     var totCap  = (allData[prod.key]||[]).reduce(function(s,r){return s+(r.capacity||0);},0);
 
-    h += '<table style="border-collapse:collapse;width:100%;table-layout:auto;margin-top:' + (pi===0?'0':'4px') + ';">';
+    // [수정2] table-layout:fixed 적용 + colgroup으로 열 너비 명시 고정
+    // → auto 모드에서 셀 내용 길이에 따라 열 너비가 달라지던 문제 해결
+    h += '<table style="border-collapse:collapse;width:100%;'
+       + 'table-layout:fixed;'  // [수정2 핵심] auto → fixed 변경
+       + 'margin-top:' + (pi===0?'0':PROD_GAP+'px') + ';">';
 
-    // 기본정보 헤더 (rowspan=2) + 월 헤더 (Loss 인라인)
-    h += '<tr>';
+    // [수정2] colgroup으로 기본정보 열 3개 너비 명시 고정
+    // 주차 열은 wkW로 균등 고정
+    h += '<colgroup>';
+    h += '<col style="width:' + coW  + 'px;">'; // Company 열 고정
+    h += '<col style="width:' + locW + 'px;">'; // Country 열 고정
+    h += '<col style="width:' + capW + 'px;">'; // Cap 열 고정
+    // 주차 셀 colgroup (wkW로 균등 분할)
+    showWeeks.forEach(function() {
+      h += '<col style="width:' + wkW + 'px;">';
+    });
+    h += '</colgroup>';
+
+    // ── 행1: 품목 헤더(rowspan=2) + 월 헤더 (Loss 인라인) ──
+    h += '<tr style="height:' + HDR1_H + 'px;">';
     h += '<td colspan="' + nI + '" rowspan="2" style="background:' + prod.hdColor + ';color:#fff;'
        + 'font-weight:700;font-size:10px;text-align:center;vertical-align:middle;'
-       + 'padding:4px 5px;' + bd + 'white-space:nowrap;">'
+       + 'padding:3px 5px;' + bd + 'white-space:nowrap;">'
        + prod.key
        + '<br><span style="font-size:8px;font-weight:400;color:#AED6F1;">'
-       + '정지 ' + shutCnt + '개 설비 | NEA ' + (allData[prod.key]||[]).length + '개</span></td>';
+       + '정지 ' + shutCnt + '개 | NEA ' + (allData[prod.key]||[]).length + '개</span></td>';
 
-    // 월 헤더: colspan=주차수만, Loss를 월 텍스트 안에 인라인
+    // 월 헤더: colspan=주차수, Loss 인라인
     monthGroups.forEach(function(mg) {
       var bg       = M_XL[mg.m] || '#f0f4f8';
       var mLossKt  = rows.reduce(function(s,r){ return s + calcRowLoss(r, mg.m); }, 0);
       var mLossRate= totCap > 0 ? (mLossKt / totCap * 100).toFixed(1) : '0.0';
       var lossInfo = mLossKt > 0
-        ? '<br><span style="color:#1a252f;font-size:10px;font-weight:700;">' + mLossKt.toFixed(0) + 'kt / ' + mLossRate + '%</span>'
+        ? '<br><span style="color:#1a252f;font-size:9px;font-weight:700;">' + mLossKt.toFixed(0) + 'kt / ' + mLossRate + '%</span>'
         : '';
       h += '<td colspan="' + mg.wks.length + '" style="background:' + bg + ';color:#1a252f;'
-         + 'font-weight:700;font-size:10px;text-align:center;padding:5px 2px;line-height:1.4;' + bd + '">'
-         + MN[mg.m-1] + lossInfo
-         + '</td>';
+         + 'font-weight:700;font-size:10px;text-align:center;padding:3px 2px;line-height:1.3;' + bd + '">'
+         + MN[mg.m-1] + lossInfo + '</td>';
     });
     h += '</tr>';
 
-    // 주차 헤더: 연속 루프 (Loss 별도 열 없음)
-    h += '<tr>';
+    // ── 행2: 주차 헤더 ──
+    h += '<tr style="height:' + HDR2_H + 'px;">';
     showWeeks.forEach(function(wk) {
       var bg  = M_XL[wk.month] || '#f0f4f8';
       var ic  = wk.week === curWeek;
       var cbg = ic ? '#FEF9E7' : bg;
       var brd = ic ? 'border-left:2px solid #E67E22;border-right:2px solid #E67E22;' : bd;
       h += '<td style="background:' + cbg + ';' + brd + 'font-weight:700;font-size:7px;'
-         + 'text-align:center;padding:2px 1px;width:' + wkW + 'px;white-space:nowrap;line-height:1.3;">'
+         + 'text-align:center;padding:1px;white-space:nowrap;line-height:1.2;vertical-align:middle;">'
          + 'W' + wk.week + '<br><span style="font-size:6px;color:#7f8c8d;">' + wk.sd + '</span></td>';
     });
     h += '</tr>';
 
-    // 데이터 없음
+    // ── 데이터 없음 처리 ──
     if (!rows.length) {
-      h += '<tr><td colspan="' + totalCols + '" style="text-align:center;padding:10px;color:#888;font-size:9px;">데이터 없음</td></tr>';
+      h += '<tr style="height:' + rowH + 'px;"><td colspan="' + totalCols
+         + '" style="text-align:center;padding:4px;color:#888;font-size:9px;">데이터 없음</td></tr>';
       h += '</table>';
       return;
     }
 
-    // 데이터 행 (Country 그룹 헤더 제거, Country 컬럼 표시)
+    // ── 데이터 행 ──
+    // rowH: A4 고정 높이에서 역산된 행 높이 적용 → 한 페이지에 맞춤
     var ri_g = 0;
     groupByCountry(rows).forEach(function(g) {
-      g.rows.forEach(function(r, ri) {
-        var rb = ri_g%2===0 ? '#F2F3F4' : '#FFFFFF';
-        var co = ri_g%2===0 ? '#EBF5FB' : '#F8FAFB';
+      g.rows.forEach(function(r) {
+        var rb = ri_g%2===0 ? '#F2F3F4' : '#FFFFFF'; // 짝수/홀수 행 배경
+        var co = ri_g%2===0 ? '#EBF5FB' : '#F8FAFB'; // Company 열 배경
         ri_g++;
-        h += '<tr>';
-         // Company
-         h += '<td style="background:' + co + ';color:#1a252f;font-weight:600;font-size:9px;'
-            + 'padding:2px 5px;' + bd + 'width:1%;white-space:nowrap;">'
-            + esc(r.company) + '</td>';
-         // Location
-         h += '<td style="background:' + rb + ';font-size:8px;color:#555;padding:2px 4px;' + bd + 'width:1%;white-space:nowrap;">'
-            + esc(g.country||'') + '</td>';
-         // Cap
-         h += '<td style="background:' + rb + ';text-align:right;font-weight:700;color:#117A65;font-size:9px;padding:2px 4px;' + bd + 'width:1%;white-space:nowrap;">'
-            + (r.capacity ? Math.round(r.capacity) : '') + '</td>';
+        h += '<tr style="height:' + rowH + 'px;">';
 
-        // 주차 셀만 연속 (Loss는 월 헤더에 인라인)
+        // Company 열 - [수정2] width:coW 명시 (auto 방지)
+        h += '<td style="background:' + co + ';color:#1a252f;font-weight:600;font-size:' + fSize + 'px;'
+           + 'padding:1px 4px;' + bd + 'width:' + coW + 'px;'
+           + 'white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'
+           + esc(r.company) + '</td>';
+
+        // Country 열 - [수정2] width:locW 명시
+        h += '<td style="background:' + rb + ';font-size:' + (fSize-1) + 'px;color:#555;'
+           + 'padding:1px 3px;' + bd + 'width:' + locW + 'px;'
+           + 'white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'
+           + esc(g.country||'') + '</td>';
+
+        // Cap 열 - [수정2] width:capW 명시
+        h += '<td style="background:' + rb + ';text-align:right;font-weight:700;'
+           + 'color:#117A65;font-size:' + fSize + 'px;'
+           + 'padding:1px 3px;' + bd + 'width:' + capW + 'px;white-space:nowrap;">'
+           + (r.capacity ? Math.round(r.capacity) : '') + '</td>';
+
+        // 주차 셀 - [수정2] width:wkW 명시
         showWeeks.forEach(function(wk) {
           var c   = r.weekColors ? r.weekColors[wk.idx] : null;
           var ic  = wk.week === curWeek;
           var bg  = c ? c : rb;
           var brd = ic ? 'border-left:2px solid #E67E22;border-right:2px solid #E67E22;' : bd;
-          h += '<td style="background:' + bg + ';' + brd + 'min-width:' + wkW + 'px;max-width:' + wkW + 'px;text-align:center;padding:1px;"></td>';
+          h += '<td style="background:' + bg + ';' + brd
+             + 'width:' + wkW + 'px;text-align:center;padding:0;"></td>';
         });
         h += '</tr>';
       });
     });
 
-    // Loss 합계는 월 헤더에 인라인 표시되므로 별도 합계행 없음
-
     h += '</table>';
   });
 
-  // 범례
-  h += '<table style="border-collapse:collapse;width:100%;margin-top:3px;">';
-  h += '<tr><td style="background:#F8F9FA;border-top:2px solid #BDC3C7;padding:4px 12px;">'
+  // ── 범례 ──
+  h += '<table style="border-collapse:collapse;width:100%;margin-top:2px;">';
+  h += '<tr style="height:' + LEGEND_H + 'px;">'
+     + '<td style="background:#F8F9FA;border-top:2px solid #BDC3C7;padding:3px 12px;">'
      + '<span style="font-size:8px;color:#555;margin-right:8px;">범례:</span>'
      + dot('#F1C40F') + '<span style="font-size:8px;color:#555;margin-right:10px;">정기보수</span>'
      + dot('#E74C3C') + '<span style="font-size:8px;color:#555;margin-right:10px;">긴급/비계획 정지</span>'
      + dot('#3498DB') + '<span style="font-size:8px;color:#555;margin-right:14px;">예정 보수</span>'
-     + '<span style="font-size:8px;color:#7D6608;">Loss% = 해당 품목 NEA 전체 Capacity 대비 (Loss kt / NEA 전체 Capacity × 100)</span>'
+     + '<span style="font-size:8px;color:#7D6608;">Loss% = NEA 전체 Capacity 대비 (Loss kt / NEA Cap × 100)</span>'
      + '</td></tr></table>';
 
   h += '</div>';
   return h;
 }
 
+// ════════════════════════════════════════════
+// 유틸: 범례 색상 점
+// ════════════════════════════════════════════
 function dot(c) {
-  return '<span style="display:inline-block;width:10px;height:10px;background:' + c
+  return '<span style="display:inline-block;width:9px;height:9px;background:' + c
        + ';border-radius:2px;vertical-align:middle;margin-right:3px;"></span>';
 }
 
@@ -672,14 +745,11 @@ function calcRowLoss(row, month) {
   if (!row.weekColors || !row.capacity) return 0;
   // 해당 월에 속하는 주차들
   var mwks = weekMeta.filter(function(w){ return w.month === month; });
-  // 겹치는 주 수 카운트 (주당 7일 기준 → 실제 겹침일수는 단순히 정지 여부로만)
   var shutDays = 0;
   mwks.forEach(function(wk) {
     if (row.weekColors[wk.idx]) {
-      // 해당 주의 월 내 일수 계산
-      var mon = wk.monday;
-      var sun = wk.sunday;
-      // 해당 월 범위
+      var mon    = wk.monday;
+      var sun    = wk.sunday;
       var mStart = new Date(YEAR, month-1, 1);
       var mEnd   = new Date(YEAR, month, 0); // 월 말일
       var os = mon > mStart ? mon : mStart;
@@ -701,7 +771,7 @@ function calcTotalLoss(rows, months) {
 }
 
 // ════════════════════════════════════════════
-// 유틸
+// 유틸 함수들
 // ════════════════════════════════════════════
 function filterRows(rows, months) {
   return rows.filter(function(r) {
